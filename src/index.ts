@@ -5,7 +5,6 @@ import { uploadImage, deleteImage, listAllKeys, getPublicUrl, getKeyFromUrl, S3E
 import * as OTPAuth from 'otpauth';
 import { Security, UserPayload } from './security';
 
-// database row interfaces for type safety
 interface DBUser {
     id: number;
     email: string;
@@ -22,10 +21,8 @@ interface DBUser {
     pending_email?: string;
     verification_token?: string;
     email_change_token?: string;
-    // add other optional fields used in queries
 }
 
-// helper type for post-with-author queries used in notification logic
 interface PostAuthorInfo {
     title: string;
     author_id: number;
@@ -67,30 +64,24 @@ async function hashPassword(password: string): Promise<string> {
 	return hashHex;
 }
 
-// Utility to generate a random token (simple UUID for now) - DEPRECATED for AUTH, used for verification/reset
 function generateToken(): string {
 	return crypto.randomUUID();
 }
 
-// Utility to check for control characters
 function hasControlCharacters(str: string): boolean {
-	// eslint-disable-next-line no-control-regex
 	return /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(str);
 }
 
-// Utility to check if string is visually empty
 function isVisuallyEmpty(str: string): boolean {
 	if (!str) return true;
 	const stripped = str.replace(/[\s\u200B-\u200F\uFEFF\u2028\u2029\u180E\u3164\u115F\u1160\x00-\x1F\x7F]+/g, '');
 	return stripped.length === 0;
 }
 
-// Utility to check for invisible characters
 function hasInvisibleCharacters(str: string): boolean {
 	return /[\u200B-\u200F\uFEFF\u2028\u2029\u180E\u3164\u115F\u1160]/.test(str);
 }
 
-// Utility to check restricted username keywords
 function hasRestrictedKeywords(username: string): boolean {
 	const restricted = ['管理', 'admin', 'sudo', 'test'];
 	return restricted.some(keyword => username.toLowerCase().includes(keyword.toLowerCase()));

@@ -2,8 +2,8 @@
 import { AwsClient } from 'aws4fetch';
 
 export interface S3Env {
-    BUCKET?: R2Bucket; // Cloudflare R2 binding (preferred)
-    R2_PUBLIC_BASE_URL?: string; // e.g. https://forum.example.com/r2
+    BUCKET?: R2Bucket;
+    R2_PUBLIC_BASE_URL?: string;
     AWS_ACCESS_KEY_ID?: string;
     AWS_SECRET_ACCESS_KEY?: string;
     AWS_REGION?: string;
@@ -32,7 +32,6 @@ export async function uploadImage(env: S3Env, file: File, userId: string | numbe
         key = `${pathPrefix}/usr/${userId}/post/${postId}/${filename}`.replace(/^\/+/, '');
     }
 
-    // Use R2 binding if available (preferred method)
     if (env.BUCKET) {
         const buffer = await file.arrayBuffer();
         await env.BUCKET.put(key, buffer, {
@@ -40,15 +39,12 @@ export async function uploadImage(env: S3Env, file: File, userId: string | numbe
                 contentType: file.type,
             },
         });
-        // Return the key; caller decides how to build a public URL
         return key;
     }
 
-    // Fallback to S3 API (AWS_ENDPOINT required)
     if (!env.AWS_ENDPOINT || !env.AWS_BUCKET) {
         throw new Error('S3/R2 not configured: Either bind an R2 bucket (BUCKET) or set AWS_ENDPOINT and AWS_BUCKET environment variables');
     }
-    // ensure endpoint is a valid URL and not a placeholder
     try {
         new URL(env.AWS_ENDPOINT);
     } catch (e) {
@@ -60,11 +56,9 @@ export async function uploadImage(env: S3Env, file: File, userId: string | numbe
 
     const s3 = getClient(env);
     
-    // trim trailing slash on endpoint
     const cleanedEndpoint = env.AWS_ENDPOINT.replace(/\/+$/, '');
     const url = `${cleanedEndpoint}/${env.AWS_BUCKET}/${key}`;
 
-    // sanity-check constructed URL
     try {
         new URL(url);
     } catch (e) {
@@ -81,7 +75,6 @@ export async function uploadImage(env: S3Env, file: File, userId: string | numbe
             }
         });
     } catch (e: any) {
-        // likely network or invalid URL
         throw new Error(`S3 fetch error: ${e.message}`);
     }
 
@@ -114,7 +107,6 @@ export function getKeyFromUrl(env: S3Env, imageUrl: string): string | null {
         }
     }
 
-    // S3 API: full URL
     if (env.AWS_ENDPOINT && env.AWS_BUCKET) {
         const prefix = `${env.AWS_ENDPOINT.replace(/\/+$/, '')}/${env.AWS_BUCKET}/`;
         if (imageUrl.startsWith(prefix)) return imageUrl.substring(prefix.length);

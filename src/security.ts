@@ -6,7 +6,6 @@ export interface UserPayload {
     id: number;
     role: string;
     email: string;
-    // Add other fields as needed
 }
 
 export class Security {
@@ -24,7 +23,6 @@ export class Security {
         this.secret = new TextEncoder().encode(secretStr);
     }
 
-    // 1. Generate JWT Token
     async generateToken(user: UserPayload): Promise<{ token: string; jti: string; expiresAt: number }> {
         const jti = crypto.randomUUID();
         const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
@@ -32,12 +30,11 @@ export class Security {
             .setProtectedHeader({ alg: 'HS256' })
             .setJti(jti)
             .setIssuedAt()
-            .setExpirationTime('24h') // 24 hours validity
+            .setExpirationTime('24h')
             .sign(this.secret);
         return { token, jti, expiresAt };
     }
 
-    // 2. Verify JWT Token and return payload
     async verifyToken(token: string): Promise<UserPayload | null> {
         try {
             const { payload } = await jwtVerify(token, this.secret);
@@ -68,7 +65,6 @@ export class Security {
         }
     }
 
-    // 3. Replay Protection (Nonce + Timestamp)
     async validateRequest(request: Request): Promise<{ valid: boolean; error?: string }> {
         const timestamp = request.headers.get('X-Timestamp');
         const nonce = request.headers.get('X-Nonce');
@@ -83,12 +79,10 @@ export class Security {
         const now = Math.floor(Date.now() / 1000);
         const ts = parseInt(timestamp, 10);
 
-        // Check timestamp validity (within 5 minutes)
         if (Math.abs(now - ts) > NONCE_TTL) {
             return { valid: false, error: 'Request expired' };
         }
 
-        // Check if nonce exists
         const existing = await this.env.cforum_db.prepare('SELECT nonce FROM nonces WHERE nonce = ?').bind(nonce).first();
         if (existing) {
             return { valid: false, error: 'Replay detected' };
@@ -96,7 +90,6 @@ export class Security {
 
         await this.env.cforum_db.prepare('INSERT INTO nonces (nonce, expires_at) VALUES (?, ?)').bind(nonce, ts + NONCE_TTL).run();
         
-        // Lazy cleanup: 1 in 100 requests cleans up old nonces
         if (Math.random() < 0.01) {
              await this.env.cforum_db.prepare('DELETE FROM nonces WHERE expires_at < ?').bind(now).run();
         }
@@ -104,7 +97,6 @@ export class Security {
         return { valid: true };
     }
 
-    // 4. Audit Logging
     async logAudit(userId: number | null, action: string, resourceType: string, resourceId: string, details: any, request: Request) {
         const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
         await this.env.cforum_db.prepare(
