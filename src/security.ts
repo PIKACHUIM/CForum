@@ -17,15 +17,6 @@ export class Security {
         this.env = env;
         let secretStr = String(env.JWT_SECRET || '');
         if (!secretStr || secretStr.length < 32) {
-            // Instead of failing hard, fall back to a generated temporary key so that
-            // the worker can still serve read-only endpoints (posts/categories).
-            // This is most helpful when users deploy via the one-click link and forget
-            // to configure the JWT_SECRET secret. Without it the worker used to return
-            // "Server misconfigured" and nothing would work.
-            //
-            // Note: tokens issued with a temporary key will be invalidated on the next
-            // request, so login/logout will not function properly until a real secret
-            // is provided. We log a warning so developers notice the misconfiguration.
             console.warn('JWT_SECRET missing or too short; generating a temporary key. Configure a proper secret to enable authentication and preserve sessions.');
             const arr = crypto.getRandomValues(new Uint8Array(48));
             secretStr = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -83,9 +74,6 @@ export class Security {
         const nonce = request.headers.get('X-Nonce');
 
         if (!timestamp || !nonce) {
-            // Allow GET requests without nonce for public data? 
-            // Requirement says "All sensitive operations", implying GET might be exempt or strictly checked.
-            // Let's enforce for mutation methods (POST, PUT, DELETE)
             if (['POST', 'PUT', 'DELETE'].includes(request.method)) {
                  return { valid: false, error: 'Missing security headers' };
             }
@@ -106,10 +94,6 @@ export class Security {
             return { valid: false, error: 'Replay detected' };
         }
 
-        // Store nonce (Async, but we should await to ensure safety or use batch)
-        // We also need to clean up old nonces. For now, just insert.
-        // In a real worker, we might use `ctx.waitUntil` for cleanup or a cron trigger.
-        // Here we just insert with expiry.
         await this.env.cforum_db.prepare('INSERT INTO nonces (nonce, expires_at) VALUES (?, ?)').bind(nonce, ts + NONCE_TTL).run();
         
         // Lazy cleanup: 1 in 100 requests cleans up old nonces
