@@ -165,7 +165,7 @@ function PostsTab() {
 						) : posts.map(p => (
 							<tr key={p.id} className="border-t border-sakura/10 hover:bg-sakura/5 transition-colors">
 								<td className="px-3 py-2 max-w-[200px]">
-									<a href={`/posts/${p.id}`} target="_blank" rel="noopener noreferrer" className="truncate block hover:text-primary transition-colors">{p.title}</a>
+<a href={`/post?id=${p.id}`} target="_blank" rel="noopener noreferrer" className="truncate block hover:text-primary transition-colors">{p.title}</a>
 								</td>
 								<td className="px-3 py-2 hidden md:table-cell text-muted-foreground">{p.author_name}</td>
 								<td className="px-3 py-2 hidden lg:table-cell text-muted-foreground">{p.category_name || '未分类'}</td>
@@ -278,7 +278,7 @@ function CommentsTab() {
 								</td>
 								<td className="px-3 py-2 hidden md:table-cell text-muted-foreground">{c.author_name}</td>
 								<td className="px-3 py-2 hidden lg:table-cell">
-									<a href={`/posts/${c.post_id}`} target="_blank" rel="noopener noreferrer" className="truncate block hover:text-primary transition-colors max-w-[120px]">{c.post_title}</a>
+<a href={`/post?id=${c.post_id}`} target="_blank" rel="noopener noreferrer" className="truncate block hover:text-primary transition-colors max-w-[120px]">{c.post_title}</a>
 								</td>
 								<td className="px-3 py-2"><StatusBadge status={c.status} /></td>
 								<td className="px-3 py-2 hidden md:table-cell text-muted-foreground whitespace-nowrap">{formatDate(c.created_at)}</td>
