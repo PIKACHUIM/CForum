@@ -79,13 +79,21 @@
 2. 点击 **New repository secret**，添加以下密钥：
 
 | Secret 名称 | 值 | 描述 | 是否必需 |
-|-----------|----|----|----|
+| Secret 名称 | 值 | 描述 | 是否必需 |
+|-----------|----|----|----||
 | `CF_API_TOKEN` | Cloudflare API Token | [创建CF_API_TOKEN](https://dash.cloudflare.com/profile/api-tokens) | 必需 |
 | `CF_ACCOUNT_ID` | 你的 Cloudflare Account ID | [查看CF_ACCOUNT_ID](https://dash.cloudflare.com/caching/overview) | 必需 |
 | `JWT_SECRET` | 随机字符串 | `head -c 32 /dev/urandom \| base64` | 必需 |
-| `RESEND_KEY` | Resend API Key | 在 [Resend 控制台](https://resend.com/api-keys) 创建 | 非必需，未配置则无法注册 |
-| `RESEND_FROM` | 发件人邮箱地址 | 例如：noreply@example.com（需在 Resend 中验证域名） | 非必需，未配置则无法注册 |
-| `RESEND_FROM_NAME` | 发件人显示名称 | 例如：CForum（未设置则使用"论坛管理员"） | 非必需，未配置则无法注册 |
+| `WORKER_URL` | Worker 地址 | 例如：`https://cfwforum-work.adysec.workers.dev`（Pages Functions 代理后端的目标地址） | 必需 |
+| `BASE_URL` | 站点 URL | 例如：`https://forum.adysec.com`（未设置则自动使用当前请求域名） | 非必需，未配置则邮件异常 |
+| `TURNSTILE_SITE_KEY` | Cloudflare Turnstile Site Key | [Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) | 非必需，未配置则禁用验证码 |
+| `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile Secret | [Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) | 非必需，未配置则禁用验证码 |
+| `SMTP_HOST` | SMTP 服务器地址 | 例如：`smtp.example.com` | 非必需，未配置则无法发送邮件 |
+| `SMTP_PORT` | SMTP 端口 | 例如：`465` | 非必需，未配置则无法发送邮件 |
+| `SMTP_USER` | SMTP 用户名 | 例如：`noreply@example.com` | 非必需，未配置则无法发送邮件 |
+| `SMTP_PASS` | SMTP 密码 | SMTP 登录密码或授权码 | 非必需，未配置则无法发送邮件 |
+| `SMTP_FROM` | 发件人邮箱地址 | 例如：`noreply@example.com` | 非必需，未配置则无法发送邮件 |
+| `SMTP_FROM_NAME` | 发件人显示名称 | 例如：`cfwforum`（未设置则使用
 | `BASE_URL` | 站点 URL | 例如：`https://forum.adysec.com`（未设置则自动使用当前请求域名） | 非必需，未配置则邮件异常 |
 | `TURNSTILE_SITE_KEY` | Cloudflare Turnstile Site Key | [Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) | 非必需，未配置则使用Turnstile |
 | `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile Secret | [Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile) | 非必需，未配置则使用Turnstile |
@@ -123,7 +131,7 @@ Cloudflare Pages CDN (智能路由)
 ### 绑定步骤
 
 1. 进入 [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Pages**
-2. 选择 **cfwforum-work** 项目 → **Settings** → **Custom domains**
+2. 选择 **cfwforum-page** 项目 → **Settings** → **Custom domains**
 3. 点击 **Add custom domain**，输入你的域名（如 `forum.adysec.com`）
 4. 完成验证 ✅
 
