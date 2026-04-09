@@ -328,18 +328,45 @@ export function PostPage() {
 
 				{loading ? (
 					<Card>
-						<CardContent className="py-6 text-sm text-muted-foreground">加载中...</CardContent>
+						<CardContent className="py-10 text-center">
+							<div className="flex flex-col items-center gap-3">
+								<div className="flex items-center gap-2 text-2xl">
+									<span className="animate-twinkle" style={{animationDelay:'0s'}}>✨</span>
+									<span className="animate-heartbeat" style={{animationDelay:'0.2s'}}>💖</span>
+									<span className="animate-twinkle" style={{animationDelay:'0.4s'}}>✨</span>
+								</div>
+								<p className="text-sm text-muted-foreground font-display animate-pulse">加载中...</p>
+							</div>
+						</CardContent>
 					</Card>
 				) : !post ? (
 					<Card>
-						<CardContent className="py-6 text-sm text-muted-foreground">帖子不存在</CardContent>
+						<CardContent className="py-10 text-center">
+							<span className="text-4xl block mb-3">💔</span>
+							<p className="text-sm text-muted-foreground">帖子不存在或已被删除</p>
+						</CardContent>
 					</Card>
 				) : (
 					<>
+						{/* 帖子状态提示 */}
+						{(post as any).status === 'locked' && (
+							<div className="rounded-xl border border-orange-400/40 bg-orange-50/80 dark:bg-orange-900/20 px-4 py-3 text-sm text-orange-700 dark:text-orange-300 flex items-center gap-2">
+								<span>🔒</span>
+								{user && user.id === (post as any).author_id
+									? '您的帖子正在审核中，暂时仅您可见。'
+									: '该帖子已锁定，无法发表新评论。'
+								}
+							</div>
+						)}
+						{(post as any).status === 'hidden' && user?.role === 'admin' && (
+							<div className="rounded-xl border border-amber-400/40 bg-amber-50/80 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2">
+								<span>👁️</span> 该帖子已被隐藏，仅管理员可见。
+							</div>
+						)}
 						<Card>
-							<CardHeader>
+							<CardHeader className="rounded-t-2xl bg-gradient-to-r from-sakura/15 via-lavender/15 to-sky/15 border-b border-sakura/20">
 								<CardTitle className="flex flex-col gap-2">
-									<span>{post.title}</span>
+									<span className="font-display text-2xl bg-gradient-to-r from-[#e879a0] to-[#a855f7] bg-clip-text text-transparent">{post.title}</span>
 									<span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-normal text-muted-foreground">
 										<span className="inline-flex items-center gap-2">
 											{post.author_avatar ? (
@@ -538,33 +565,43 @@ export function PostPage() {
 							</CardContent>
 						</Card>
 
-						<Card>
-							<CardHeader>
-								<CardTitle>评论</CardTitle>
+							<Card>
+							<CardHeader className="rounded-t-2xl bg-gradient-to-r from-lavender/15 to-sky/15 border-b border-lavender/20">
+								<CardTitle className="font-display flex items-center gap-2">
+									<span>💬</span> 评论
+									{(post as any).status === 'locked' && (
+										<span className="ml-auto text-xs font-normal text-orange-600 flex items-center gap-1"><span>🔒</span>已锁定</span>
+									)}
+								</CardTitle>
 							</CardHeader>
-							<CardContent className="space-y-4">
-								{comments.length === 0 ? (
-									<div className="text-sm text-muted-foreground">暂无评论</div>
+								<CardContent className="space-y-4">
+									{comments.length === 0 ? (
+										<div className="text-center py-6">
+											<span className="text-3xl block mb-2">🌸</span>
+											<p className="text-sm text-muted-foreground">暂无评论，快来发表第一条吧！</p>
+										</div>
 								) : (
 									<div className="space-y-3">
-										{organizeComments(comments).map((c) => (
-											<div key={c.id} className="rounded-md border p-3">
-												<div className="flex items-center justify-between gap-2">
-													<div className="text-sm">
-														<span className="inline-flex items-center gap-2">
-															{c.avatar_url ? (
-																<img
-																	src={c.avatar_url}
-																	alt=""
-																	className="h-6 w-6 rounded-full object-cover"
-																	loading="lazy"
-																	referrerPolicy="no-referrer"
-																/>
-															) : (
-																<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
-																	<User className="h-4 w-4" />
+									{organizeComments(comments).map((c) => (
+											<div key={c.id} className={`comment-bubble p-4 ${ (c as any).status === 'locked' ? 'opacity-60 border-orange-300/50' : '' }`}>
+													<div className="flex items-center justify-between gap-2">
+														<div className="text-sm">
+															<span className="inline-flex items-center gap-2">
+																<span className="avatar-anime">
+																{c.avatar_url ? (
+																	<img
+																		src={c.avatar_url}
+																		alt=""
+																		className="h-6 w-6 rounded-full object-cover"
+																		loading="lazy"
+																		referrerPolicy="no-referrer"
+																	/>
+																) : (
+																	<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-sakura to-lavender text-white text-[10px]">
+																		<User className="h-4 w-4" />
+																	</span>
+																)}
 																</span>
-															)}
 															<span className="font-medium text-foreground">{c.username}</span>
 															{c.role === 'admin' ? (
 																<span className="inline-flex items-center gap-1 rounded border border-indigo-500/30 bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
@@ -588,11 +625,14 @@ export function PostPage() {
 														) : null}
 													</div>
 												</div>
-												<div className="mt-2 whitespace-pre-wrap text-sm">{c.content}</div>
-												{c.replies && c.replies.length ? (
-													<div className="mt-3 space-y-2 border-l pl-3">
-														{c.replies.map((r) => (
-															<div key={r.id} className="rounded-md bg-muted/30 p-2">
+											{(c as any).status === 'locked' && user?.id === c.author_id && (
+												<div className="mt-1 text-xs text-orange-600 flex items-center gap-1"><span>🔒</span>评论正在审核中，暂时仅您可见</div>
+											)}
+											<div className="mt-2 whitespace-pre-wrap text-sm">{c.content}</div>
+													{c.replies && c.replies.length ? (
+														<div className="mt-3 space-y-2 border-l-2 border-sakura/30 pl-4">
+															{c.replies.map((r) => (
+																<div key={r.id} className="comment-bubble-reply p-3">
 																<div className="flex items-center justify-between gap-2">
 																	<div className="text-xs">
 																		<span className="inline-flex items-center gap-2">
@@ -636,32 +676,39 @@ export function PostPage() {
 									</div>
 								)}
 
-								{replyTo ? (
-									<div className="flex items-center justify-between rounded-md border bg-muted/30 p-2 text-sm">
-										<span>
-											回复 <span className="font-medium">{replyTo.username}</span>
-										</span>
+									{replyTo ? (
+										<div className="flex items-center justify-between rounded-xl border-2 border-sakura/30 bg-sakura/5 p-3 text-sm">
+											<span className="flex items-center gap-2">
+												<span>💬</span>
+												回复 <span className="font-medium text-primary">{replyTo.username}</span>
+											</span>
 										<Button variant="ghost" size="sm" onClick={() => setReplyTo(null)}>
 											取消
 										</Button>
 									</div>
 								) : null}
 
-								<form className="space-y-3" onSubmit={submitComment}>
-									{commentError ? <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">{commentError}</div> : null}
-									<Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} rows={4} placeholder="写下你的评论..." />
-						<TurnstileWidget enabled={turnstileActive} siteKey={siteKey} onToken={setTurnstileToken} resetKey={turnstileResetKey} />
-									<div className="flex items-center gap-2">
-										<Button type="submit" disabled={commentLoading}>
-											{commentLoading ? '发布中...' : '发布评论'}
-										</Button>
-										{!user ? (
-											<Button type="button" variant="outline" onClick={() => (window.location.href = '/login')}>
-												登录后评论
+									{(post as any).status === 'locked' ? (
+										<div className="rounded-xl border border-orange-300/40 bg-orange-50/60 dark:bg-orange-900/10 px-4 py-3 text-sm text-orange-600 text-center">
+											🔒 该帖子已锁定，无法发表评论
+										</div>
+									) : (
+									<form className="space-y-3" onSubmit={submitComment}>
+										{commentError ? <div className="rounded-xl border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">{commentError}</div> : null}
+										<Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} rows={4} placeholder="写下你的评论... 🌸" />
+										<TurnstileWidget enabled={turnstileActive} siteKey={siteKey} onToken={setTurnstileToken} resetKey={turnstileResetKey} />
+										<div className="flex items-center gap-2">
+											<Button type="submit" disabled={commentLoading}>
+												{commentLoading ? '🌸 发布中...' : '💬 发布评论'}
 											</Button>
-										) : null}
+									{!user ? (
+										<Button type="button" variant="outline" onClick={() => (window.location.href = '/login')}>
+											登录后评论
+										</Button>
+									) : null}
 									</div>
 								</form>
+								)}
 							</CardContent>
 						</Card>
 					</>

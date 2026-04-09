@@ -13,6 +13,7 @@ CREATE TABLE users (
   username TEXT NOT NULL,
   password TEXT NOT NULL,
   role TEXT DEFAULT 'user', -- 'user' or 'admin'
+  status TEXT DEFAULT 'normal', -- 'normal' or 'banned'
   verified INTEGER DEFAULT 0,
   verification_token TEXT,
   totp_secret TEXT,
@@ -40,6 +41,7 @@ CREATE TABLE posts (
   content TEXT NOT NULL,
   category_id INTEGER,
   is_pinned INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'normal', -- 'normal', 'hidden', 'locked'
   view_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (author_id) REFERENCES users(id),
@@ -52,6 +54,7 @@ CREATE TABLE comments (
   parent_id INTEGER,
   author_id INTEGER NOT NULL,
   content TEXT NOT NULL,
+  status TEXT DEFAULT 'normal', -- 'normal', 'hidden', 'locked'
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (post_id) REFERENCES posts(id),
   FOREIGN KEY (parent_id) REFERENCES comments(id),
@@ -102,7 +105,7 @@ INSERT INTO settings (key, value) VALUES ('turnstile_enabled', '0');
 -- Insert some dummy data
 -- Admin user (admin@adysec.com / Admin@123)
 -- Hash for 'Admin@123': ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f
-INSERT INTO users (email, username, password, role, verified, nickname) VALUES 
+INSERT INTO users (email, username, password, role, verified, nickname) VALUES
 ('admin@adysec.com', 'Admin', 'e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3acc7', 'admin', 1, 'System Admin'),
 ('alice@example.com', 'Alice', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f', 'user', 1, 'Alice Wonderland'),
 ('bob@example.com', 'Bob', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f', 'user', 0, NULL);

@@ -1,8 +1,8 @@
 import * as React from 'react';
 
 import { TurnstileWidget } from '@/components/turnstile';
+import { AuthCard, AuthPageShell } from '@/components/auth-shell';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useConfig } from '@/hooks/use-config';
@@ -64,76 +64,86 @@ export function LoginPage() {
 	}
 
 	return (
-		<div className="min-h-dvh bg-muted/20">
-			<main className="mx-auto flex max-w-5xl justify-center px-4 py-10">
-				<Card className="w-full max-w-md">
-					<CardHeader>
-						<CardTitle>登录</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<form className="space-y-4" onSubmit={handleSubmit}>
-							{error ? <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">{error}</div> : null}
+		<AuthPageShell>
+			<AuthCard>
+				<div className="p-8">
+					{/* 标题 */}
+					<div className="text-center mb-8">
+						<div className="text-4xl mb-3 animate-bounce-gentle">🌸</div>
+						<h1 className="font-display text-2xl font-bold bg-gradient-to-r from-[#e879a0] to-[#a855f7] bg-clip-text text-transparent">
+							欢迎回来
+						</h1>
+						<p className="text-sm text-muted-foreground mt-1">登录你的账号</p>
+					</div>
 
-							<div className="space-y-2">
-								<Label htmlFor="login-email">邮箱</Label>
-								<Input
-									id="login-email"
-									name="email"
-									type="email"
-									autoComplete="username"
-									value={email}
-									onChange={(e) => setEmail(e.target.value)}
-									required
-								/>
+					<form className="space-y-5" onSubmit={handleSubmit}>
+						{error ? (
+							<div className="rounded-xl border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">
+								{error}
 							</div>
+						) : null}
 
-							<div className="space-y-2">
-								<Label htmlFor="login-password">密码</Label>
-								<Input
-									id="login-password"
-									name="password"
-									type="password"
-									autoComplete="current-password"
-									value={password}
-									onChange={(e) => setPassword(e.target.value)}
-									required
-								/>
-							</div>
+						<div className="space-y-2">
+							<Label htmlFor="login-email">邮箱</Label>
+							<Input
+								id="login-email"
+								name="email"
+								type="email"
+								autoComplete="username"
+								value={email}
+								onChange={(e) => setEmail(e.target.value)}
+								placeholder="your@email.com"
+								required
+							/>
+						</div>
 
-							<div className="space-y-2">
-								<Label htmlFor="login-totp">双重验证码 (若开启)</Label>
-								<Input
-									id="login-totp"
-									name="totp_code"
-									type="text"
-									inputMode="numeric"
-									pattern="\d*"
-									maxLength={6}
-									placeholder="选填"
-									autoComplete="one-time-code"
-									value={totpCode}
-									onChange={(e) => setTotpCode(e.target.value)}
-								/>
-							</div>
+						<div className="space-y-2">
+							<Label htmlFor="login-password">密码</Label>
+							<Input
+								id="login-password"
+								name="password"
+								type="password"
+								autoComplete="current-password"
+								value={password}
+								onChange={(e) => setPassword(e.target.value)}
+								placeholder="••••••••"
+								required
+							/>
+						</div>
 
-<TurnstileWidget enabled={turnstileActive} siteKey={siteKey} onToken={setTurnstileToken} resetKey={turnstileResetKey} />
+						<div className="space-y-2">
+							<Label htmlFor="login-totp">双重验证码 <span className="text-muted-foreground text-xs">(若开启)</span></Label>
+							<Input
+								id="login-totp"
+								name="totp_code"
+								type="text"
+								inputMode="numeric"
+								pattern="\d*"
+								maxLength={6}
+								placeholder="选填"
+								autoComplete="one-time-code"
+								value={totpCode}
+								onChange={(e) => setTotpCode(e.target.value)}
+							/>
+						</div>
 
-							<Button className="w-full" type="submit" disabled={loading}>
-								{loading ? '处理中...' : '登录'}
-							</Button>
+						<TurnstileWidget enabled={turnstileActive} siteKey={siteKey} onToken={setTurnstileToken} resetKey={turnstileResetKey} />
 
-							<div className="flex justify-between text-sm">
-								<a className="text-muted-foreground hover:underline" href="/register">
-									没有账号？注册
-								</a>
-								<a className="text-muted-foreground hover:underline" href="/forgot">
-									忘记密码？
-								</a>
-							</div>
-						</form>
-					</CardContent>
-				</Card>
-			</main>
-		</div>
+						<Button className="w-full" type="submit" disabled={loading}>
+							{loading ? '🌸 登录中...' : '✨ 登录'}
+						</Button>
+
+						<div className="flex justify-between text-sm pt-1">
+							<a className="text-muted-foreground hover:text-primary transition-colors hover:underline" href="/register">
+								没有账号？注册
+							</a>
+							<a className="text-muted-foreground hover:text-primary transition-colors hover:underline" href="/forgot">
+								忘记密码？
+							</a>
+						</div>
+					</form>
+				</div>
+			</AuthCard>
+		</AuthPageShell>
 	);
 }

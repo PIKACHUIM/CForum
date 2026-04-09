@@ -519,19 +519,21 @@ export function IndexPage() {
 	return (
 		<PageShell>
 			<div className="space-y-6">
-				{banner ? <div className="rounded-md border bg-muted/40 p-3 text-sm">{banner}</div> : null}
+				{banner ? <div className="rounded-xl border border-sakura/30 bg-sakura/5 p-3 text-sm">{banner}</div> : null}
 				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-					<div>
-							<h1 className="text-2xl font-semibold tracking-tight">CForum</h1>
-						<p className="text-sm text-muted-foreground">由 Cloudflare Workers、Pages、D1、R2 提供服务。</p>
+				<div>
+						<h1 className="font-display text-3xl font-bold bg-gradient-to-r from-[#e879a0] to-[#a855f7] bg-clip-text text-transparent flex items-center gap-2">
+							<span className="animate-bounce-gentle">🌸</span> {config?.site_title || 'CForum'}
+						</h1>
+						<p className="text-sm text-muted-foreground mt-1">{config?.site_description || '由 Cloudflare Workers、Pages、D1、R2 提供服务。'}</p>
 					</div>
-					<div className="flex items-center gap-2">
+					<div className="flex flex-wrap items-center gap-2">
 						<label className="text-sm text-muted-foreground" htmlFor="category-filter">
 							分类
 						</label>
 						<select
 							id="category-filter"
-							className="h-9 rounded-md border bg-background px-3 text-sm"
+							className="h-9 rounded-xl border-2 border-border bg-background px-3 text-sm transition-all hover:border-sakura/60 focus:outline-none focus:border-sakura focus:shadow-glow-pink"
 							value={selectedCategory}
 							onChange={(e) => {
 								setSelectedCategory(e.target.value);
@@ -551,7 +553,7 @@ export function IndexPage() {
 						</label>
 						<select
 							id="sort-filter"
-							className="h-9 rounded-md border bg-background px-3 text-sm"
+							className="h-9 rounded-xl border-2 border-border bg-background px-3 text-sm transition-all hover:border-sakura/60 focus:outline-none focus:border-sakura focus:shadow-glow-pink"
 							value={sortOption}
 							onChange={(e) => {
 								setSortOption(e.target.value);
@@ -608,9 +610,9 @@ export function IndexPage() {
 
 				{user ? (
 					<Card>
-						<CardHeader>
+						<CardHeader className="rounded-t-2xl bg-gradient-to-r from-sakura/20 via-lavender/20 to-sky/20 border-b border-sakura/20">
 							<CardTitle className="flex items-center justify-between gap-2">
-								<span>发布新帖</span>
+								<span className="flex items-center gap-2">✏️ 发布新帖</span>
 								<Button type="button" variant="outline" size="sm" onClick={() => setCreateOpen((v) => !v)}>
 									{createOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
 									<span className="sr-only">{createOpen ? '收起' : '展开'}</span>
@@ -628,11 +630,11 @@ export function IndexPage() {
 										<Label htmlFor="new-title">标题</Label>
 										<Input id="new-title" maxLength={30} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} required />
 									</div>
-									<div className="space-y-2">
-										<Label htmlFor="new-category">分类 (可选)</Label>
-										<select
-											id="new-category"
-											className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+								<div className="space-y-2">
+									<Label htmlFor="new-category">分类 (可选)</Label>
+									<select
+										id="new-category"
+										className="h-10 w-full rounded-xl border-2 border-border bg-background px-3 text-sm transition-all hover:border-sakura/60 focus:outline-none focus:border-sakura focus:shadow-glow-pink"
 											value={newCategoryId}
 											onChange={(e) => setNewCategoryId(e.target.value)}
 										>
@@ -671,8 +673,8 @@ export function IndexPage() {
 										<div className="text-xs text-muted-foreground">Ctrl+T 表格，Ctrl+Shift+M 公式，Ctrl+Shift+Q 引用，Alt+Shift+5 删除线</div>
 									</div>
 									{previewOpen ? (
-										<div className="rounded-md border bg-muted/20 p-3">
-											<div className="mb-2 text-xs font-medium text-muted-foreground">预览</div>
+										<div className="preview-panel">
+											<div className="mb-2 text-xs font-medium text-primary flex items-center gap-1">👁️ 预览</div>
 											<div
 												ref={previewRef}
 												className="prose max-w-none break-words [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1"
@@ -729,23 +731,24 @@ export function IndexPage() {
 		</div>
 		<TurnstileWidget enabled={turnstileActive} siteKey={siteKey} onToken={setTurnstileToken} resetKey={turnstileResetKey} />
 
-								<Button type="submit" disabled={createLoading}>
-									{createLoading ? '发布中...' : '发布'}
+								<Button type="submit" disabled={createLoading} className="px-8">
+									{createLoading ? '🌸 发布中...' : '🚀 发布'}
 								</Button>
 							</form>
 							)}
 						</CardContent>
 					</Card>
-				) : (
-					<Card>
-						<CardContent className="py-6 text-sm text-muted-foreground">
-							<a className="text-foreground underline" href="/login">
-								登录
-							</a>{' '}
-							后可发布、点赞和评论。
-						</CardContent>
-					</Card>
-				)}
+					) : (
+						<Card>
+							<CardContent className="py-6 text-sm text-muted-foreground text-center">
+								<span className="text-2xl block mb-2">🌸</span>
+								<a className="text-primary font-medium hover:underline" href="/login">
+									登录
+								</a>{' '}
+								后可发布、点赞和评论。
+							</CardContent>
+						</Card>
+					)}
 
 				{error ? <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">{error}</div> : null}
 
@@ -753,11 +756,23 @@ export function IndexPage() {
 					<div ref={listTopRef} />
 					{loading ? (
 						<Card>
-							<CardContent className="py-6 text-sm text-muted-foreground">加载中...</CardContent>
+							<CardContent className="py-10 text-center">
+								<div className="flex flex-col items-center gap-3">
+									<div className="flex items-center gap-2 text-2xl">
+										<span className="animate-twinkle" style={{animationDelay:'0s'}}>✨</span>
+										<span className="animate-heartbeat" style={{animationDelay:'0.2s'}}>💖</span>
+										<span className="animate-twinkle" style={{animationDelay:'0.4s'}}>✨</span>
+									</div>
+									<p className="text-sm text-muted-foreground font-display animate-pulse">加载中...</p>
+								</div>
+							</CardContent>
 						</Card>
 					) : posts.length === 0 ? (
 						<Card>
-							<CardContent className="py-6 text-sm text-muted-foreground">暂无帖子</CardContent>
+							<CardContent className="py-10 text-center">
+								<span className="text-4xl block mb-3">🌸</span>
+								<p className="text-sm text-muted-foreground">暂无帖子，快来发第一帖吧！</p>
+							</CardContent>
 						</Card>
 					) : (
 						posts.map((p) => {
@@ -781,11 +796,11 @@ export function IndexPage() {
 											<div className="min-w-0 flex-1 space-y-1">
 												<div className="flex items-start justify-between gap-2">
 													<div className="flex min-w-0 items-center gap-2">
-														{p.is_pinned ? (
-															<span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
-																<Pin className="h-3.5 w-3.5" />
-																置顶
-															</span>
+											{p.is_pinned ? (
+												<span className="badge-pinned">
+													<span>👑</span>
+													置顶
+												</span>
 														) : null}
 														<a className="truncate text-lg font-semibold hover:underline" href={`/posts/${p.id}`}>
 															{p.title}
@@ -812,8 +827,8 @@ export function IndexPage() {
 																<span className="sr-only">更多</span>
 															</Button>
 															{menuOpen ? (
-																<div
-																	className="absolute right-0 top-full z-50 mt-1 w-40 rounded-md border bg-background p-1 shadow-md"
+														<div
+															className="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border-2 border-sakura/20 bg-background/95 p-1 shadow-anime backdrop-blur-sm"
 																	onMouseDown={(e) => e.stopPropagation()}
 																	onTouchStart={(e) => e.stopPropagation()}
 																	onClick={(e) => e.stopPropagation()}
@@ -863,20 +878,22 @@ export function IndexPage() {
 													) : null}
 												</div>
 												<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-													<span className="inline-flex items-center gap-2">
-														{p.author_avatar ? (
-															<img
-																src={p.author_avatar}
-																alt=""
-																className="h-6 w-6 rounded-full object-cover"
-																loading="lazy"
-																referrerPolicy="no-referrer"
-															/>
-														) : (
-															<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
-																<User className="h-4 w-4" />
-															</span>
-														)}
+												<span className="inline-flex items-center gap-2">
+													<span className="avatar-anime">
+													{p.author_avatar ? (
+														<img
+															src={p.author_avatar}
+															alt=""
+															className="h-6 w-6 rounded-full object-cover"
+															loading="lazy"
+															referrerPolicy="no-referrer"
+														/>
+													) : (
+														<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-sakura to-lavender text-white text-[10px]">
+															<User className="h-3.5 w-3.5" />
+														</span>
+													)}
+													</span>
 														<span className="truncate text-foreground">{p.author_name}</span>
 														{p.author_role === 'admin' ? (
 															<span className="inline-flex items-center gap-1 rounded border border-indigo-500/30 bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
@@ -895,16 +912,16 @@ export function IndexPage() {
 													<span className="whitespace-nowrap">{formatDate(p.created_at)}</span>
 												</div>
 												<div className="flex items-center gap-4 text-xs text-muted-foreground">
-													<span className="inline-flex items-center gap-1">
-														<Heart className="h-4 w-4 text-rose-600" />
+													<span className="inline-flex items-center gap-1 hover:text-rose-500 transition-colors">
+														<span className="animate-heartbeat text-sm">💖</span>
 														{p.like_count || 0}
 													</span>
-													<span className="inline-flex items-center gap-1">
-														<MessageCircle className="h-4 w-4 text-sky-600" />
+													<span className="inline-flex items-center gap-1 hover:text-sky-500 transition-colors">
+														<span className="text-sm">💬</span>
 														{p.comment_count || 0}
 													</span>
-													<span className="inline-flex items-center gap-1">
-														<Eye className="h-4 w-4 text-emerald-600" />
+													<span className="inline-flex items-center gap-1 hover:text-emerald-500 transition-colors">
+														<span className="text-sm">👁️</span>
 														{p.view_count || 0}
 													</span>
 												</div>

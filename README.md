@@ -4,6 +4,9 @@
 
 **💡 性能优化**：采用 Pages + Worker 混合部署，静态资源免费无限请求，节省 ~90% Worker 成本！
 
+本项目Fork自 [adysec/CForum ](https://github.com/adysec/CForum) ，后端参考了 [afoim/acofork_forum_backend](https://github.com/afoim/acofork_forum_backend)
+
+
 ---
 
 ## 🏗️ 架构设计

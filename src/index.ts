@@ -140,6 +140,20 @@ export default {
 			});
 		}
 
+		// IP 地区检测（禁止区域）
+		const blockedRegionsSetting = await env.cfwforum_db.prepare("SELECT value FROM settings WHERE key = 'site_blocked_regions'").first<DBSetting>().catch(() => null);
+		if (blockedRegionsSetting && blockedRegionsSetting.value) {
+			const blockedRegions = blockedRegionsSetting.value.split(',').map((r: string) => r.trim().toUpperCase()).filter(Boolean);
+			const country = request.headers.get('CF-IPCountry') || '';
+			if (blockedRegions.includes(country.toUpperCase())) {
+				// 只对页面请求返回禁止访问，API 请求也拦截
+				return new Response(
+					`<!DOCTYPE html><html><head><meta charset="utf-8"><title>访问受限</title></head><body style="font-family:sans-serif;text-align:center;padding:80px;background:#fff9fb"><h1 style="color:#e879a0">🚫 访问受限</h1><p>很抱歉，您所在的地区无法访问本站。</p><p style="color:#999">Access from your region is not allowed.</p></body></html>`,
+					{ status: 403, headers: { 'Content-Type': 'text/html;charset=utf-8' } }
+				);
+			}
+		}
+
 		// Helper to return JSON response with CORS
 		const jsonResponse = (data: any, status = 200) => {
 			return Response.json(data, {
@@ -299,6 +313,11 @@ export default {
 			if (!payload) {
 				throw new Error('Unauthorized');
 			}
+			// 检查用户是否被封禁
+			const userStatus = await env.cfwforum_db.prepare('SELECT status FROM users WHERE id = ?').bind(payload.id).first<{ status: string }>();
+			if (userStatus && userStatus.status === 'banned') {
+				throw new Error('账号已被封禁，如有疑问请联系管理员');
+			}
 			return payload;
 		};
 
@@ -338,9 +357,10 @@ export default {
 		// GET /api/config
 		if (url.pathname === '/api/config' && method === 'GET') {
 			try {
-				const [setting, userCount] = await Promise.all([
+				const [setting, userCount, allSettings] = await Promise.all([
 					env.cfwforum_db.prepare("SELECT value FROM settings WHERE key = 'turnstile_enabled'").first<DBSetting>(),
-					env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM users').first('count')
+					env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM users').first('count'),
+					env.cfwforum_db.prepare("SELECT key, value FROM settings").all()
 				]);
 
 				// 只有数据库设置为启用，且两个环境变量都配置时，才启用 Turnstile
@@ -349,11 +369,37 @@ export default {
 				const secretKey = (env as any).TURNSTILE_SECRET_KEY || '';
 				const turnstileFullyConfigured = !!(dbEnabled && siteKey && secretKey);
 
+				// 构建站点设置 map
+				const settingsMap: Record<string, string> = {};
+				if (allSettings.results) {
+					for (const row of allSettings.results as any[]) {
+						settingsMap[row.key] = row.value;
+					}
+				}
+
 				return jsonResponse({
 					turnstile_enabled: turnstileFullyConfigured,
 					turnstile_site_key: siteKey,
 					user_count: userCount || 0,
-					jwt_secret_configured: !!env.JWT_SECRET && String(env.JWT_SECRET).length >= 32
+					jwt_secret_configured: !!env.JWT_SECRET && String(env.JWT_SECRET).length >= 32,
+					// 站点设置
+					site_title: settingsMap['site_title'] || '',
+					site_description: settingsMap['site_description'] || '',
+					site_primary_color: settingsMap['site_primary_color'] || '#e879a0',
+					site_favicon_url: settingsMap['site_favicon_url'] || '',
+					site_announcement: settingsMap['site_announcement'] || '',
+					site_icp: settingsMap['site_icp'] || '',
+					site_footer_html: settingsMap['site_footer_html'] || '',
+					site_bg_image: settingsMap['site_bg_image'] || '',
+					site_bg_opacity: settingsMap['site_bg_opacity'] || '1',
+					site_custom_css: settingsMap['site_custom_css'] || '',
+					site_custom_js: settingsMap['site_custom_js'] || '',
+					site_terms: settingsMap['site_terms'] || '',
+					site_privacy: settingsMap['site_privacy'] || '',
+					site_blocked_regions: settingsMap['site_blocked_regions'] || '',
+					site_post_rate_limit: settingsMap['site_post_rate_limit'] || '',
+					site_comment_rate_limit: settingsMap['site_comment_rate_limit'] || '',
+					site_keyword_filter: settingsMap['site_keyword_filter'] || '',
 				});
 			} catch (e) {
 				return handleError(e);
@@ -372,12 +418,34 @@ export default {
 					notify_on_user_delete: false,
 					notify_on_username_change: false,
 					notify_on_avatar_change: false,
-					notify_on_manual_verify: false
+					notify_on_manual_verify: false,
+					site_title: '',
+					site_description: '',
+					site_primary_color: '#e879a0',
+					site_favicon_url: '',
+					site_announcement: '',
+					site_icp: '',
+					site_footer_html: '',
+					site_bg_image: '',
+					site_bg_opacity: '1',
+					site_custom_css: '',
+					site_custom_js: '',
+					site_terms: '',
+					site_privacy: '',
+					site_blocked_regions: '',
+					site_post_rate_limit: '',
+					site_comment_rate_limit: '',
+					site_keyword_filter: '',
 				};
 
+				const boolKeys = ['turnstile_enabled', 'notify_on_user_delete', 'notify_on_username_change', 'notify_on_avatar_change', 'notify_on_manual_verify'];
 				if (settings.results) {
-					for (const row of settings.results) {
-						config[row.key as string] = row.value === '1';
+					for (const row of settings.results as any[]) {
+						if (boolKeys.includes(row.key)) {
+							config[row.key] = row.value === '1';
+						} else {
+							config[row.key] = row.value;
+						}
 					}
 				}
 
@@ -394,19 +462,32 @@ export default {
 				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
 
 				const body = await request.json() as any;
-				const { turnstile_enabled, notify_on_user_delete, notify_on_username_change, notify_on_avatar_change, notify_on_manual_verify } = body;
 
 				const stmt = env.cfwforum_db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)");
 				const batch = [];
 
-				if (turnstile_enabled !== undefined) batch.push(stmt.bind('turnstile_enabled', turnstile_enabled ? '1' : '0'));
-				if (notify_on_user_delete !== undefined) batch.push(stmt.bind('notify_on_user_delete', notify_on_user_delete ? '1' : '0'));
-				if (notify_on_username_change !== undefined) batch.push(stmt.bind('notify_on_username_change', notify_on_username_change ? '1' : '0'));
-				if (notify_on_avatar_change !== undefined) batch.push(stmt.bind('notify_on_avatar_change', notify_on_avatar_change ? '1' : '0'));
-				if (notify_on_manual_verify !== undefined) batch.push(stmt.bind('notify_on_manual_verify', notify_on_manual_verify ? '1' : '0'));
+				// 布尔类型设置
+				const boolKeys = ['turnstile_enabled', 'notify_on_user_delete', 'notify_on_username_change', 'notify_on_avatar_change', 'notify_on_manual_verify'];
+				for (const key of boolKeys) {
+					if (body[key] !== undefined) batch.push(stmt.bind(key, body[key] ? '1' : '0'));
+				}
+
+				// 字符串类型设置
+				const strKeys = [
+					'site_title', 'site_description', 'site_primary_color', 'site_favicon_url',
+					'site_announcement', 'site_icp', 'site_footer_html', 'site_bg_image',
+					'site_bg_opacity', 'site_custom_css', 'site_custom_js', 'site_terms',
+					'site_privacy', 'site_blocked_regions', 'site_post_rate_limit',
+					'site_comment_rate_limit', 'site_keyword_filter',
+					'turnstile_site_key'
+				];
+				for (const key of strKeys) {
+					if (body[key] !== undefined) batch.push(stmt.bind(key, String(body[key])));
+				}
 
 				if (batch.length > 0) await env.cfwforum_db.batch(batch);
 
+				await security.logAudit(userPayload.id, 'ADMIN_UPDATE_SETTINGS', 'settings', 'global', {}, request);
 				return jsonResponse({ success: true });
 			} catch (e) {
 				return handleError(e);
@@ -1237,6 +1318,231 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE email_chan
 			}
 		}
 
+		// GET /api/admin/posts (管理帖子列表，支持分页/搜索/筛选)
+		if (url.pathname === '/api/admin/posts' && method === 'GET') {
+			try {
+				const userPayload = await authenticate(request);
+				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
+
+				const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
+				const offset = parseInt(url.searchParams.get('offset') || '0');
+				const q = (url.searchParams.get('q') || '').trim();
+				const status = url.searchParams.get('status') || '';
+
+				let conditions: string[] = [];
+				const params: any[] = [];
+
+				if (q) {
+					conditions.push('(posts.title LIKE ? OR posts.content LIKE ?)');
+					params.push(`%${q}%`, `%${q}%`);
+				}
+				if (status) {
+					conditions.push('posts.status = ?');
+					params.push(status);
+				}
+
+				const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+				const { results } = await env.cfwforum_db.prepare(
+					`SELECT posts.id, posts.title, posts.status, posts.is_pinned, posts.created_at,
+					        users.username as author_name, categories.name as category_name
+					 FROM posts
+					 JOIN users ON posts.author_id = users.id
+					 LEFT JOIN categories ON posts.category_id = categories.id
+					 ${where}
+					 ORDER BY posts.created_at DESC LIMIT ? OFFSET ?`
+				).bind(...params, limit, offset).all();
+
+				const countRow = await env.cfwforum_db.prepare(
+					`SELECT COUNT(*) as total FROM posts JOIN users ON posts.author_id = users.id ${where}`
+				).bind(...params).first<{ total: number }>();
+
+				return jsonResponse({ posts: results, total: countRow?.total || 0 });
+			} catch (e) {
+				return handleError(e);
+			}
+		}
+
+		// GET /api/admin/comments (管理评论列表，支持分页/搜索/筛选)
+		if (url.pathname === '/api/admin/comments' && method === 'GET') {
+			try {
+				const userPayload = await authenticate(request);
+				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
+
+				const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
+				const offset = parseInt(url.searchParams.get('offset') || '0');
+				const q = (url.searchParams.get('q') || '').trim();
+				const status = url.searchParams.get('status') || '';
+
+				let conditions: string[] = [];
+				const params: any[] = [];
+
+				if (q) {
+					conditions.push('comments.content LIKE ?');
+					params.push(`%${q}%`);
+				}
+				if (status) {
+					conditions.push('comments.status = ?');
+					params.push(status);
+				}
+
+				const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+				const { results } = await env.cfwforum_db.prepare(
+					`SELECT comments.id, comments.content, comments.status, comments.created_at,
+					        users.username as author_name, posts.title as post_title, posts.id as post_id
+					 FROM comments
+					 JOIN users ON comments.author_id = users.id
+					 JOIN posts ON comments.post_id = posts.id
+					 ${where}
+					 ORDER BY comments.created_at DESC LIMIT ? OFFSET ?`
+				).bind(...params, limit, offset).all();
+
+				const countRow = await env.cfwforum_db.prepare(
+					`SELECT COUNT(*) as total FROM comments JOIN users ON comments.author_id = users.id ${where}`
+				).bind(...params).first<{ total: number }>();
+
+				return jsonResponse({ comments: results, total: countRow?.total || 0 });
+			} catch (e) {
+				return handleError(e);
+			}
+		}
+
+		// GET /api/admin/users (管理用户列表，支持分页/搜索/筛选)
+		if (url.pathname === '/api/admin/users' && method === 'GET') {
+			try {
+				const userPayload = await authenticate(request);
+				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
+
+				const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
+				const offset = parseInt(url.searchParams.get('offset') || '0');
+				const q = (url.searchParams.get('q') || '').trim();
+				const status = url.searchParams.get('status') || '';
+
+				let conditions: string[] = [];
+				const params: any[] = [];
+
+				if (q) {
+					conditions.push('(username LIKE ? OR email LIKE ?)');
+					params.push(`%${q}%`, `%${q}%`);
+				}
+				if (status) {
+					conditions.push('status = ?');
+					params.push(status);
+				}
+
+				const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+				const { results } = await env.cfwforum_db.prepare(
+					`SELECT id, email, username, role, verified, status, created_at, avatar_url FROM users ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+				).bind(...params, limit, offset).all();
+
+				const countRow = await env.cfwforum_db.prepare(
+					`SELECT COUNT(*) as total FROM users ${where}`
+				).bind(...params).first<{ total: number }>();
+
+				return jsonResponse({ users: results, total: countRow?.total || 0 });
+			} catch (e) {
+				return handleError(e);
+			}
+		}
+
+		// POST /api/admin/posts/:id/action (hide/lock/delete/restore)
+		if (url.pathname.match(/^\/api\/admin\/posts\/\d+\/action$/) && method === 'POST') {
+			const id = url.pathname.split('/')[4];
+			try {
+				const userPayload = await authenticate(request);
+				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
+
+				const body = await request.json() as any;
+				const { action } = body;
+
+				if (!['hide', 'lock', 'delete', 'restore'].includes(action)) {
+					return jsonResponse({ error: 'Invalid action' }, 400);
+				}
+
+				if (action === 'delete') {
+					const post = await env.cfwforum_db.prepare('SELECT content, author_id FROM posts WHERE id = ?').bind(id).first();
+					if (post) {
+						const imageUrls = extractImageUrls(post.content as string);
+						if (imageUrls.length > 0) {
+							ctx.waitUntil(Promise.all(imageUrls.map(u => deleteImage(env as unknown as S3Env, u, post.author_id as number))).catch(console.error));
+						}
+					}
+					await env.cfwforum_db.prepare('DELETE FROM likes WHERE post_id = ?').bind(id).run();
+					await env.cfwforum_db.prepare('DELETE FROM comments WHERE post_id = ?').bind(id).run();
+					await env.cfwforum_db.prepare('DELETE FROM posts WHERE id = ?').bind(id).run();
+				} else {
+					const statusMap: Record<string, string> = { hide: 'hidden', lock: 'locked', restore: 'normal' };
+					await env.cfwforum_db.prepare('UPDATE posts SET status = ? WHERE id = ?').bind(statusMap[action], id).run();
+				}
+
+				await security.logAudit(userPayload.id, `ADMIN_POST_${action.toUpperCase()}`, 'post', id, {}, request);
+				return jsonResponse({ success: true });
+			} catch (e) {
+				return handleError(e);
+			}
+		}
+
+		// POST /api/admin/comments/:id/action (hide/lock/delete/restore)
+		if (url.pathname.match(/^\/api\/admin\/comments\/\d+\/action$/) && method === 'POST') {
+			const id = url.pathname.split('/')[4];
+			try {
+				const userPayload = await authenticate(request);
+				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
+
+				const body = await request.json() as any;
+				const { action } = body;
+
+				if (!['hide', 'lock', 'delete', 'restore'].includes(action)) {
+					return jsonResponse({ error: 'Invalid action' }, 400);
+				}
+
+				if (action === 'delete') {
+					await env.cfwforum_db.prepare('DELETE FROM comments WHERE parent_id = ?').bind(id).run();
+					await env.cfwforum_db.prepare('DELETE FROM comments WHERE id = ?').bind(id).run();
+				} else {
+					const statusMap: Record<string, string> = { hide: 'hidden', lock: 'locked', restore: 'normal' };
+					await env.cfwforum_db.prepare('UPDATE comments SET status = ? WHERE id = ?').bind(statusMap[action], id).run();
+				}
+
+				await security.logAudit(userPayload.id, `ADMIN_COMMENT_${action.toUpperCase()}`, 'comment', id, {}, request);
+				return jsonResponse({ success: true });
+			} catch (e) {
+				return handleError(e);
+			}
+		}
+
+		// POST /api/admin/users/:id/action (ban/unban/hide)
+		if (url.pathname.match(/^\/api\/admin\/users\/\d+\/action$/) && method === 'POST') {
+			const id = url.pathname.split('/')[4];
+			try {
+				const userPayload = await authenticate(request);
+				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
+
+				const body = await request.json() as any;
+				const { action } = body;
+
+				if (!['ban', 'unban', 'hide'].includes(action)) {
+					return jsonResponse({ error: 'Invalid action' }, 400);
+				}
+
+				if (action === 'ban') {
+					await env.cfwforum_db.prepare('UPDATE users SET status = ? WHERE id = ?').bind('banned', id).run();
+					// 使该用户所有 session 失效（通过删除 sessions 表记录）
+					await env.cfwforum_db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id).run();
+				} else if (action === 'unban') {
+					await env.cfwforum_db.prepare('UPDATE users SET status = ? WHERE id = ?').bind('normal', id).run();
+				} else if (action === 'hide') {
+					// 隐藏该用户的所有帖子和评论
+					await env.cfwforum_db.prepare('UPDATE posts SET status = ? WHERE author_id = ?').bind('hidden', id).run();
+					await env.cfwforum_db.prepare('UPDATE comments SET status = ? WHERE author_id = ?').bind('hidden', id).run();
+				}
+
+				await security.logAudit(userPayload.id, `ADMIN_USER_${action.toUpperCase()}`, 'user', id, {}, request);
+				return jsonResponse({ success: true });
+			} catch (e) {
+				return handleError(e);
+			}
+		}
+
 		// DELETE /api/admin/posts/:id
 		if (url.pathname.startsWith('/api/admin/posts/') && method === 'DELETE') {
 			const id = url.pathname.split('/').pop();
@@ -1756,6 +2062,82 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE email_chan
 			}
 		}
 
+		// POST /api/posts/:id/comments (创建评论)
+		if (url.pathname.match(/^\/api\/posts\/\d+\/comments$/) && method === 'POST') {
+			const postId = url.pathname.split('/')[3];
+			try {
+				const userPayload = await authenticate(request);
+				const body = await request.json() as any;
+
+				// Turnstile Check
+				const ip = request.headers.get('CF-Connecting-IP') || '127.0.0.1';
+				if (!(await checkTurnstile(body, ip))) {
+					return jsonResponse({ error: 'Turnstile verification failed' }, 403);
+				}
+
+				const { content, parent_id } = body;
+				if (!content) return jsonResponse({ error: 'Missing content' }, 400);
+				if (content.length > 3000) return jsonResponse({ error: 'Content too long (Max 3000 chars)' }, 400);
+				if (isVisuallyEmpty(content)) return jsonResponse({ error: 'Content cannot be empty' }, 400);
+				if (hasInvisibleCharacters(content)) return jsonResponse({ error: 'Content contains invalid invisible characters' }, 400);
+				if (hasControlCharacters(content)) return jsonResponse({ error: 'Content contains invalid control characters' }, 400);
+
+				// 检查帖子是否存在且未锁定
+				const post = await env.cfwforum_db.prepare('SELECT id, status FROM posts WHERE id = ?').bind(postId).first<{ id: number; status: string }>();
+				if (!post) return jsonResponse({ error: 'Post not found' }, 404);
+				if (post.status === 'locked') return jsonResponse({ error: '该帖子已锁定，无法评论' }, 403);
+
+				// 频率限制检查
+				const commentRateSetting = await env.cfwforum_db.prepare("SELECT value FROM settings WHERE key = 'site_comment_rate_limit'").first<DBSetting>();
+				if (commentRateSetting && commentRateSetting.value) {
+					try {
+						const rateConfig = JSON.parse(commentRateSetting.value);
+						const { count, unit } = rateConfig;
+						const unitMs: Record<string, number> = { minute: 60000, hour: 3600000, day: 86400000 };
+						const windowMs = (unitMs[unit] || 60000) * (rateConfig.window || 1);
+						const since = new Date(Date.now() - windowMs).toISOString().replace('T', ' ').slice(0, 19);
+						const recentCount = await env.cfwforum_db.prepare(
+							"SELECT COUNT(*) as cnt FROM comments WHERE author_id = ? AND created_at > ?"
+						).bind(userPayload.id, since).first<{ cnt: number }>();
+						if (recentCount && recentCount.cnt >= count) {
+							return jsonResponse({ error: `评论过于频繁，请稍后再试` }, 429);
+						}
+					} catch {}
+				}
+
+				// 关键词过滤检查
+				let commentStatus = 'normal';
+				const keywordSetting = await env.cfwforum_db.prepare("SELECT value FROM settings WHERE key = 'site_keyword_filter'").first<DBSetting>();
+				if (keywordSetting && keywordSetting.value) {
+					const keywords = keywordSetting.value.split('\n').map((k: string) => k.trim()).filter(Boolean);
+					if (keywords.some((kw: string) => content.toLowerCase().includes(kw.toLowerCase()))) {
+						commentStatus = 'locked';
+					}
+				}
+
+				// HTML Escape
+				const safeContent = content
+					.replace(/&/g, '&amp;')
+					.replace(/</g, '&lt;')
+					.replace(/>/g, '&gt;')
+					.replace(/"/g, '&quot;')
+					.replace(/'/g, '&#039;');
+
+				await env.cfwforum_db.prepare(
+					'INSERT INTO comments (post_id, parent_id, author_id, content, status) VALUES (?, ?, ?, ?, ?)'
+				).bind(postId, parent_id || null, userPayload.id, safeContent.trim(), commentStatus).run();
+
+				await security.logAudit(userPayload.id, 'CREATE_COMMENT', 'comment', postId, {}, request);
+
+				if (commentStatus === 'locked') {
+					return jsonResponse({ success: true, locked: true, message: '评论包含违禁词，正在审核中' }, 201);
+				}
+				return jsonResponse({ success: true }, 201);
+			} catch (e) {
+				return handleError(e);
+			}
+		}
+
 		// DELETE /api/comments/:id
 		if (url.pathname.match(/^\/api\/comments\/\d+$/) && method === 'DELETE') {
 			const id = url.pathname.split('/').pop();
@@ -1868,15 +2250,44 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE email_chan
 					.replace(/"/g, '&quot;')
 					.replace(/'/g, '&#039;');
 
-				// Validate Category
+			// Validate Category
 				if (category_id) {
 					const category = await env.cfwforum_db.prepare('SELECT id FROM categories WHERE id = ?').bind(category_id).first();
 					if (!category) return jsonResponse({ error: 'Category not found' }, 400);
 				}
 
+				// 频率限制检查
+				const postRateSetting = await env.cfwforum_db.prepare("SELECT value FROM settings WHERE key = 'site_post_rate_limit'").first<DBSetting>();
+				if (postRateSetting && postRateSetting.value) {
+					try {
+						const rateConfig = JSON.parse(postRateSetting.value);
+						const { count, unit } = rateConfig;
+						const unitMs: Record<string, number> = { minute: 60000, hour: 3600000, day: 86400000 };
+						const windowMs = (unitMs[unit] || 60000) * (rateConfig.window || 1);
+						const since = new Date(Date.now() - windowMs).toISOString().replace('T', ' ').slice(0, 19);
+						const recentCount = await env.cfwforum_db.prepare(
+							"SELECT COUNT(*) as cnt FROM posts WHERE author_id = ? AND created_at > ?"
+						).bind(userPayload.id, since).first<{ cnt: number }>();
+						if (recentCount && recentCount.cnt >= count) {
+							return jsonResponse({ error: `发帖过于频繁，请稍后再试` }, 429);
+						}
+					} catch {}
+				}
+
+				// 关键词过滤检查
+				let postStatus = 'normal';
+				const keywordSetting = await env.cfwforum_db.prepare("SELECT value FROM settings WHERE key = 'site_keyword_filter'").first<DBSetting>();
+				if (keywordSetting && keywordSetting.value) {
+					const keywords = keywordSetting.value.split('\n').map((k: string) => k.trim()).filter(Boolean);
+					const textToCheck = `${safeTitle} ${content}`.toLowerCase();
+					if (keywords.some((kw: string) => textToCheck.includes(kw.toLowerCase()))) {
+						postStatus = 'locked';
+					}
+				}
+
 				const { success } = await env.cfwforum_db.prepare(
-					'INSERT INTO posts (author_id, title, content, category_id) VALUES (?, ?, ?, ?)'
-				).bind(userPayload.id, safeTitle.trim(), content.trim(), category_id || null).run();
+					'INSERT INTO posts (author_id, title, content, category_id, status) VALUES (?, ?, ?, ?, ?)'
+				).bind(userPayload.id, safeTitle.trim(), content.trim(), category_id || null, postStatus).run();
 
 				await security.logAudit(userPayload.id, 'CREATE_POST', 'post', 'new', { title_length: safeTitle.length }, request);
 

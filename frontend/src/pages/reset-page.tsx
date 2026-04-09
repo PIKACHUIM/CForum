@@ -1,8 +1,8 @@
 import * as React from 'react';
 
 import { TurnstileWidget } from '@/components/turnstile';
+import { AuthCard, AuthPageShell } from '@/components/auth-shell';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useConfig } from '@/hooks/use-config';
@@ -62,53 +62,71 @@ export function ResetPage() {
 	}
 
 	return (
-		<div className="min-h-dvh bg-muted/20">
-			<main className="mx-auto flex max-w-5xl justify-center px-4 py-10">
-				<Card className="w-full max-w-md">
-					<CardHeader>
-						<CardTitle>重置密码</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<form className="space-y-4" onSubmit={handleSubmit}>
-							{error ? <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">{error}</div> : null}
-							{success ? <div className="rounded-md border bg-muted/40 p-3 text-sm">{success}</div> : null}
-							<div className="space-y-2">
-								<Label htmlFor="reset-password">新密码</Label>
-								<Input
-									id="reset-password"
-									type="password"
-									autoComplete="new-password"
-									value={password}
-									onChange={(e) => setPassword(e.target.value)}
-									required
-								/>
+		<AuthPageShell>
+			<AuthCard>
+				<div className="p-8">
+					<div className="text-center mb-8">
+						<div className="text-4xl mb-3 animate-bounce-gentle">🔑</div>
+						<h1 className="font-display text-2xl font-bold bg-gradient-to-r from-[#e879a0] to-[#a855f7] bg-clip-text text-transparent">
+							重置密码
+						</h1>
+						<p className="text-sm text-muted-foreground mt-1">设置你的新密码</p>
+					</div>
+
+					<form className="space-y-5" onSubmit={handleSubmit}>
+						{error ? (
+							<div className="rounded-xl border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">
+								{error}
 							</div>
-							<div className="space-y-2">
-								<Label htmlFor="reset-totp">双重验证码 (若开启)</Label>
-								<Input
-									id="reset-totp"
-									type="text"
-									inputMode="numeric"
-									maxLength={6}
-									autoComplete="one-time-code"
-									value={totpCode}
-									onChange={(e) => setTotpCode(e.target.value)}
-								/>
+						) : null}
+						{success ? (
+							<div className="rounded-xl border border-mint/50 bg-mint/10 p-3 text-sm text-green-700 dark:text-green-300">
+								🎉 {success}
 							</div>
-							<TurnstileWidget enabled={turnstileActive} siteKey={siteKey} onToken={setTurnstileToken} resetKey={turnstileResetKey} />
-							<Button className="w-full" type="submit" disabled={loading}>
-								{loading ? '处理中...' : '重置密码'}
-							</Button>
-							<div className="text-sm">
-								<a className="text-muted-foreground hover:underline" href="/login">
-									返回登录
-								</a>
-							</div>
-						</form>
-					</CardContent>
-				</Card>
-			</main>
-		</div>
+						) : null}
+
+						<div className="space-y-2">
+							<Label htmlFor="reset-password">新密码</Label>
+							<Input
+								id="reset-password"
+								type="password"
+								autoComplete="new-password"
+								value={password}
+								onChange={(e) => setPassword(e.target.value)}
+								placeholder="••••••••"
+								required
+							/>
+						</div>
+
+						<div className="space-y-2">
+							<Label htmlFor="reset-totp">双重验证码 <span className="text-muted-foreground text-xs">(若开启)</span></Label>
+							<Input
+								id="reset-totp"
+								type="text"
+								inputMode="numeric"
+								maxLength={6}
+								autoComplete="one-time-code"
+								value={totpCode}
+								onChange={(e) => setTotpCode(e.target.value)}
+								placeholder="选填"
+							/>
+						</div>
+
+						<TurnstileWidget enabled={turnstileActive} siteKey={siteKey} onToken={setTurnstileToken} resetKey={turnstileResetKey} />
+
+						<Button className="w-full" type="submit" disabled={loading}>
+							{loading ? '🔑 处理中...' : '✨ 重置密码'}
+						</Button>
+
+						<div className="text-sm text-center pt-1">
+							<a className="text-muted-foreground hover:text-primary transition-colors hover:underline" href="/login">
+								返回登录
+							</a>
+						</div>
+					</form>
+				</div>
+			</AuthCard>
+		</AuthPageShell>
 	);
 }
 
