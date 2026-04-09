@@ -722,9 +722,9 @@ export default {
 						// Generate Identicon
 						newAvatarUrl = await generateIdenticon(String(user_id));
 					} else {
-						if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (Max 500 chars)' }, 400);
-						if (!/^https?:\/\//i.test(avatar_url) && !avatar_url.startsWith('data:image/svg+xml')) return jsonResponse({ error: 'Invalid Avatar URL (Must start with http:// or https://)' }, 400);
-						newAvatarUrl = avatar_url;
+if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (Max 500 chars)' }, 400);
+				if (!/^https?:\/\//i.test(avatar_url)) return jsonResponse({ error: 'Invalid Avatar URL (Must start with http:// or https://)' }, 400);
+				newAvatarUrl = avatar_url;
 					}
 				}
 
@@ -1237,9 +1237,9 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE email_chan
 						const identicon = await generateIdenticon(String(id));
 						await env.cfwforum_db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').bind(identicon, id).run();
 					} else {
-						if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (Max 500 chars)' }, 400);
-						if (!/^https?:\/\//i.test(avatar_url) && !avatar_url.startsWith('data:image/svg+xml')) return jsonResponse({ error: 'Invalid Avatar URL' }, 400);
-						await env.cfwforum_db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').bind(avatar_url, id).run();
+if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (Max 500 chars)' }, 400);
+				if (!/^https?:\/\//i.test(avatar_url)) return jsonResponse({ error: 'Invalid Avatar URL' }, 400);
+				await env.cfwforum_db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').bind(avatar_url, id).run();
 					}
 
 					// Notify Avatar Change
