@@ -25,6 +25,14 @@ CREATE TABLE users (
   avatar_url TEXT,
   nickname TEXT,
   email_notifications INTEGER DEFAULT 1,
+  -- 扩展个人资料字段
+  age INTEGER,
+  gender TEXT,
+  birthday TEXT,
+  attribute TEXT,
+  is_nanliang INTEGER DEFAULT 0,
+  bio TEXT,
+  bg_image TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -139,7 +139,7 @@ function hasRestrictedKeywords(username: string): boolean {
 	return restricted.some(keyword => username.toLowerCase().includes(keyword.toLowerCase()));
 }
 
-async function verifyTurnstile(token: string, ip: string, secretKey: string): Promise<boolean> {
+async function verifyTurnstile(token: string, ip: string, secretKey: string): Promise<{ success: boolean; error_codes?: string[] }> {
 	const formData = new FormData();
 	formData.append('secret', secretKey);
 	formData.append('response', token);
@@ -152,7 +152,7 @@ async function verifyTurnstile(token: string, ip: string, secretKey: string): Pr
 	});
 
 	const outcome = await result.json() as any;
-	return outcome.success;
+	return { success: outcome.success, error_codes: outcome['error-codes'] };
 }
 
 export default {
@@ -405,7 +405,8 @@ export default {
         const isPublicGet = method === 'GET' && (
             publicPaths.includes(url.pathname) ||
             url.pathname.match(/^\/api\/posts\/\d+$/) ||
-            url.pathname.match(/^\/api\/posts\/\d+\/comments$/)
+            url.pathname.match(/^\/api\/posts\/\d+\/comments$/) ||
+            url.pathname.match(/^\/api\/user\/\d+\/profile$/)
         );
 
         // However, user specifically asked for "Replay protection for sensitive operations".
@@ -558,7 +559,7 @@ export default {
 		}
 
 		// Helper to check Turnstile if enabled
-		const checkTurnstile = async (reqBody: any, ip: string) => {
+		const checkTurnstile = async (reqBody: any, ip: string): Promise<{ ok: boolean; reason?: string }> => {
 			const setting = await env.cfwforum_db.prepare("SELECT value FROM settings WHERE key = 'turnstile_enabled'").first<DBSetting>();
 			// 只有数据库启用且两个环境变量都配置时才要求验证（与前端逻辑一致）
 			const dbEnabled = setting && setting.value === '1';
@@ -568,10 +569,17 @@ export default {
 
 			if (fullyConfigured) {
 				const token = reqBody['cf-turnstile-response'];
-				if (!token) return false;
-				return await verifyTurnstile(token, ip, secretKey);
+				if (!token) return { ok: false, reason: 'Missing Turnstile token' };
+				const result = await verifyTurnstile(token, ip, secretKey);
+				if (!result.success) {
+					const reason = result.error_codes && result.error_codes.length > 0
+						? result.error_codes.join(', ')
+						: 'Unknown error';
+					return { ok: false, reason };
+				}
+				return { ok: true };
 			}
-			return true;
+			return { ok: true };
 		};
 
 		// POST /api/upload (Image Upload)
@@ -618,8 +626,9 @@ export default {
 
 				// Turnstile Check
 				const ip = request.headers.get('CF-Connecting-IP') || '127.0.0.1';
-				if (!(await checkTurnstile(body, ip))) {
-					return jsonResponse({ error: 'Turnstile verification failed' }, 403);
+				const turnstileResult = await checkTurnstile(body, ip);
+				if (!turnstileResult.ok) {
+					return jsonResponse({ error: `Turnstile verification failed: ${turnstileResult.reason}` }, 403);
 				}
 
 				const { email, password, totp_code } = body;
@@ -696,7 +705,7 @@ export default {
 			try {
 				const userPayload = await authenticate(request);
 				const body = await request.json() as any;
-				const { avatar_url, email_notifications } = body;
+				const { avatar_url, email_notifications, age, gender, birthday, attribute, is_nanliang, bio, bg_image } = body;
 				// 用户名不允许用户自行修改，忽略传入的 username 字段
 
 				const user_id = userPayload.id;
@@ -724,8 +733,29 @@ export default {
 					newEmailNotif = email_notifications ? 1 : 0;
 				}
 
-				await env.cfwforum_db.prepare('UPDATE users SET username = ?, avatar_url = ?, email_notifications = ? WHERE id = ?')
-					.bind(newUsername, newAvatarUrl, newEmailNotif, user_id).run();
+				// 处理扩展个人资料字段
+				const newAge = age !== undefined ? (age === null || age === '' ? null : parseInt(age)) : currentUser.age;
+				const newGender = gender !== undefined ? (gender || null) : currentUser.gender;
+				const newBirthday = birthday !== undefined ? (birthday || null) : currentUser.birthday;
+				const newAttribute = attribute !== undefined ? (attribute || null) : currentUser.attribute;
+				const newIsNanliang = is_nanliang !== undefined ? (is_nanliang ? 1 : 0) : (currentUser.is_nanliang || 0);
+				const newBio = bio !== undefined ? (bio || null) : currentUser.bio;
+
+				// 处理背景图
+				let newBgImage = currentUser.bg_image;
+				if (bg_image !== undefined) {
+					if (bg_image === '' || bg_image === null) {
+						newBgImage = null;
+					} else {
+						if (bg_image.length > 500) return jsonResponse({ error: 'Background image URL too long (Max 500 chars)' }, 400);
+						if (!/^https?:\/\//i.test(bg_image) && !bg_image.startsWith('data:image/svg+xml')) return jsonResponse({ error: 'Invalid background image URL' }, 400);
+						newBgImage = bg_image;
+					}
+				}
+
+				await env.cfwforum_db.prepare(
+					'UPDATE users SET username = ?, avatar_url = ?, email_notifications = ?, age = ?, gender = ?, birthday = ?, attribute = ?, is_nanliang = ?, bio = ?, bg_image = ? WHERE id = ?'
+				).bind(newUsername, newAvatarUrl, newEmailNotif, newAge, newGender, newBirthday, newAttribute, newIsNanliang, newBio, newBgImage, user_id).run();
 
 			const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE id = ?').bind(user_id).first<DBUser>();
 			if (!user) return jsonResponse({ error: 'User not found' }, 404);
@@ -738,9 +768,95 @@ export default {
 						avatar_url: user.avatar_url,
 						role: user.role || 'user',
 						totp_enabled: !!user.totp_enabled,
-						email_notifications: user.email_notifications === 1
+						email_notifications: user.email_notifications === 1,
+						age: user.age ?? null,
+						gender: user.gender ?? null,
+						birthday: user.birthday ?? null,
+						attribute: user.attribute ?? null,
+						is_nanliang: !!user.is_nanliang,
+						bio: user.bio ?? null,
+						bg_image: user.bg_image ?? null
 					}
 				});
+			} catch (e) {
+				return handleError(e);
+			}
+		}
+
+		// GET /api/user/:id/profile - 公开用户资料
+		if (url.pathname.match(/^\/api\/user\/\d+\/profile$/) && method === 'GET') {
+			const targetUserId = url.pathname.split('/')[3];
+			try {
+				const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE id = ?').bind(targetUserId).first<DBUser>();
+				if (!user) return jsonResponse({ error: 'User not found' }, 404);
+
+				// 获取用户帖子（最近20条）
+				const limit = Math.min(parseInt(url.searchParams.get('post_limit') || '20'), 50);
+				const postOffset = Math.max(parseInt(url.searchParams.get('post_offset') || '0'), 0);
+				const commentOffset = Math.max(parseInt(url.searchParams.get('comment_offset') || '0'), 0);
+
+				const [postsResult, postsCount, commentsResult, commentsCount] = await Promise.all([
+					env.cfwforum_db.prepare(
+						`SELECT posts.*, categories.name as category_name,
+						(SELECT COUNT(*) FROM likes WHERE likes.post_id = posts.id) as like_count,
+						(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) as comment_count
+						FROM posts
+						LEFT JOIN categories ON posts.category_id = categories.id
+						WHERE posts.author_id = ? AND posts.status = 'normal'
+						ORDER BY posts.created_at DESC LIMIT ? OFFSET ?`
+					).bind(targetUserId, limit, postOffset).all(),
+					env.cfwforum_db.prepare(
+						`SELECT COUNT(*) as total FROM posts WHERE author_id = ? AND status = 'normal'`
+					).bind(targetUserId).first<DBCount>(),
+					env.cfwforum_db.prepare(
+						`SELECT comments.*, posts.title as post_title, posts.id as post_id
+						FROM comments
+						JOIN posts ON comments.post_id = posts.id
+						WHERE comments.author_id = ? AND comments.status = 'normal' AND posts.status = 'normal'
+						ORDER BY comments.created_at DESC LIMIT ? OFFSET ?`
+					).bind(targetUserId, limit, commentOffset).all(),
+					env.cfwforum_db.prepare(
+						`SELECT COUNT(*) as total FROM comments
+						JOIN posts ON comments.post_id = posts.id
+						WHERE comments.author_id = ? AND comments.status = 'normal' AND posts.status = 'normal'`
+					).bind(targetUserId).first<DBCount>()
+				]);
+
+				return jsonResponse({
+					user: {
+						id: user.id,
+						username: user.username,
+						avatar_url: user.avatar_url ?? null,
+						role: user.role || 'user',
+						age: user.age ?? null,
+						gender: user.gender ?? null,
+						birthday: user.birthday ?? null,
+						attribute: user.attribute ?? null,
+						is_nanliang: !!user.is_nanliang,
+						bio: user.bio ?? null,
+						bg_image: user.bg_image ?? null,
+						created_at: (user as any).created_at ?? null
+					},
+					posts: postsResult.results,
+					posts_total: postsCount?.total ?? 0,
+					comments: commentsResult.results,
+					comments_total: commentsCount?.total ?? 0
+				});
+			} catch (e) {
+				return handleError(e);
+			}
+		}
+
+		// POST /api/user/upload-bg - 上传背景图
+		if (url.pathname === '/api/user/upload-bg' && method === 'POST') {
+			try {
+				const userPayload = await authenticate(request);
+				const formData = await request.formData();
+				const file = formData.get('file') as File | null;
+				if (!file) return jsonResponse({ error: 'No file provided' }, 400);
+				const type = (formData.get('type') as string) || 'bg';
+				const url2 = await uploadImage(env as unknown as S3Env, file, type);
+				return jsonResponse({ url: url2 });
 			} catch (e) {
 				return handleError(e);
 			}
@@ -897,8 +1013,9 @@ export default {
 
 				// Turnstile Check
 				const ip = request.headers.get('CF-Connecting-IP') || '127.0.0.1';
-				if (!(await checkTurnstile(body, ip))) {
-					return jsonResponse({ error: 'Turnstile verification failed' }, 403);
+				const turnstileResult = await checkTurnstile(body, ip);
+				if (!turnstileResult.ok) {
+					return jsonResponse({ error: `Turnstile verification failed: ${turnstileResult.reason}` }, 403);
 				}
 
 				const { email } = body;
@@ -1256,19 +1373,6 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE email_chan
 					posts: postCount,
 					comments: commentCount
 				});
-			} catch (e) {
-				return handleError(e);
-			}
-		}
-
-		// GET /api/admin/users
-		if (url.pathname === '/api/admin/users' && method === 'GET') {
-			try {
-				const userPayload = await authenticate(request);
-				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
-
-				const { results } = await env.cfwforum_db.prepare('SELECT id, email, username, role, verified, created_at, avatar_url FROM users ORDER BY created_at DESC').all();
-				return jsonResponse(results);
 			} catch (e) {
 				return handleError(e);
 			}
@@ -1847,8 +1951,9 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE email_chan
 
 				// Turnstile Check
 				const ip = request.headers.get('CF-Connecting-IP') || '127.0.0.1';
-				if (!(await checkTurnstile(body, ip))) {
-					return jsonResponse({ error: 'Turnstile verification failed' }, 403);
+				const turnstileResult = await checkTurnstile(body, ip);
+				if (!turnstileResult.ok) {
+					return jsonResponse({ error: `Turnstile verification failed: ${turnstileResult.reason}` }, 403);
 				}
 
 				const { email, username, password } = body;
@@ -2001,13 +2106,16 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE email_chan
 
                 const params: any[] = [];
                 const countParams: any[] = [];
-				const conditions: string[] = [];
+                const conditions: string[] = [];
+
+				// 默认只显示正常状态的帖子（非管理员不能看到hidden帖子）
+				conditions.push(`(posts.status = 'normal' OR posts.status = 'locked')`);
 
                 if (categoryId) {
                     if (categoryId === 'uncategorized') {
-						conditions.push(`posts.category_id IS NULL`);
+					conditions.push(`posts.category_id IS NULL`);
                     } else {
-						conditions.push(`posts.category_id = ?`);
+					conditions.push(`posts.category_id = ?`);
                         params.push(categoryId);
                         countParams.push(categoryId);
                     }
@@ -2071,6 +2179,18 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE email_chan
 				).bind(postId).first();
 
 				if (!post) return jsonResponse({ error: 'Post not found' }, 404);
+
+				// 如果帖子已隐藏，只有管理员可以访问
+				if ((post as any).status === 'hidden') {
+					try {
+						const userPayload = await authenticate(request);
+						if (userPayload.role !== 'admin') {
+							return jsonResponse({ error: 'Post not found' }, 404);
+						}
+					} catch {
+						return jsonResponse({ error: 'Post not found' }, 404);
+					}
+				}
 
 				try {
 					await env.cfwforum_db.prepare('UPDATE posts SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?').bind(postId).run();
@@ -2186,7 +2306,7 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE email_chan
 					`SELECT comments.*, users.username, users.avatar_url, users.role
                      FROM comments
                      JOIN users ON comments.author_id = users.id
-                     WHERE post_id = ?
+                     WHERE post_id = ? AND comments.status != 'hidden'
                      ORDER BY created_at ASC`
 				).bind(postId).all();
 				return jsonResponse(results);
@@ -2204,8 +2324,9 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE email_chan
 
 				// Turnstile Check
 				const ip = request.headers.get('CF-Connecting-IP') || '127.0.0.1';
-				if (!(await checkTurnstile(body, ip))) {
-					return jsonResponse({ error: 'Turnstile verification failed' }, 403);
+				const turnstileResult = await checkTurnstile(body, ip);
+				if (!turnstileResult.ok) {
+					return jsonResponse({ error: `Turnstile verification failed: ${turnstileResult.reason}` }, 403);
 				}
 
 				const { content, parent_id } = body;
@@ -2360,8 +2481,9 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE email_chan
 
 				// Turnstile Check
 				const ip = request.headers.get('CF-Connecting-IP') || '127.0.0.1';
-				if (!(await checkTurnstile(body, ip))) {
-					return jsonResponse({ error: 'Turnstile verification failed' }, 403);
+				const turnstileResult = await checkTurnstile(body, ip);
+				if (!turnstileResult.ok) {
+					return jsonResponse({ error: `Turnstile verification failed: ${turnstileResult.reason}` }, 403);
 				}
 
 				const { title, content: rawContent, category_id } = body;

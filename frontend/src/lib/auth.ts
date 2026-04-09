@@ -6,6 +6,14 @@ export type User = {
 	role?: 'user' | 'admin';
 	totp_enabled?: boolean;
 	email_notifications?: boolean;
+	// 扩展个人资料字段
+	age?: number | null;
+	gender?: string | null;
+	birthday?: string | null;
+	attribute?: string | null;
+	is_nanliang?: boolean;
+	bio?: string | null;
+	bg_image?: string | null;
 };
 
 const TOKEN_KEY = 'token';

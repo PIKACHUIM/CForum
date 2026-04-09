@@ -4,7 +4,7 @@ import {
 	BarChart2, FileText, MessageSquare, RefreshCw,
 	Settings, Shield, Users, User as UserIcon, Search, X,
 	EyeOff, Lock, Trash2, CheckCircle, Ban, ChevronLeft, ChevronRight, Tag,
-	AlertTriangle, Info, CheckCircle2, XCircle
+	AlertTriangle, Info, CheckCircle2, XCircle, HardDrive
 } from 'lucide-react';
 
 import { PageShell } from '@/components/page-shell';
@@ -146,7 +146,7 @@ const DEFAULT_PRIVACY = `隐私政策
 六、联系我们
 如对本隐私政策有任何疑问，请通过站内联系管理员。`;
 
-type AdminTab = 'overview' | 'posts' | 'users' | 'comments' | 'categories' | 'settings';
+type AdminTab = 'overview' | 'posts' | 'users' | 'comments' | 'categories' | 'settings' | 'storage';
 
 // ─── 状态徽章 ────────────────────────────────────────────────
 function StatusBadge({ status }: { status?: string }) {
@@ -747,6 +747,145 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 	);
 }
 
+// ─── 存储清理 Tab ────────────────────────────────────────────
+function StorageCleanupTab() {
+	const toast = useToast();
+	type AnalyzeResult = {
+		total_files: number;
+		used_files: number;
+		orphan_files?: number;
+		orphaned_files: number;
+		orphans: string[];
+	};
+	const [analyzing, setAnalyzing] = React.useState(false);
+	const [cleaning, setCleaning] = React.useState(false);
+	const [result, setResult] = React.useState<AnalyzeResult | null>(null);
+	const [confirmOpen, setConfirmOpen] = React.useState(false);
+
+	const analyze = async () => {
+		setAnalyzing(true);
+		setResult(null);
+		try {
+			const data = await apiFetch<AnalyzeResult>('/admin/cleanup/analyze', {
+				headers: getSecurityHeaders('GET'),
+			});
+			setResult(data);
+		} catch (e: any) {
+			toast('error', e?.message || '分析失败，请检查存储配置');
+		} finally {
+			setAnalyzing(false);
+		}
+	};
+
+	const executeCleanup = async () => {
+		if (!result || result.orphans.length === 0) return;
+		setCleaning(true);
+		try {
+			await apiFetch('/admin/cleanup/execute', {
+				method: 'POST',
+				headers: { ...getSecurityHeaders('POST'), 'Content-Type': 'application/json' },
+				body: JSON.stringify({ orphans: result.orphans }),
+			});
+			toast('success', `已成功清理 ${result.orphans.length} 个未使用文件`);
+			setResult(null);
+		} catch (e: any) {
+			toast('error', e?.message || '清理失败');
+		} finally {
+			setCleaning(false);
+			setConfirmOpen(false);
+		}
+	};
+
+	return (
+		<div className="space-y-5">
+			{/* 说明卡片 */}
+			<div className="rounded-2xl border border-sky-200 bg-sky-50/60 dark:bg-sky-900/20 dark:border-sky-700/40 p-4 flex gap-3">
+				<Info className="h-5 w-5 text-sky-500 shrink-0 mt-0.5" />
+				<div className="text-sm text-sky-800 dark:text-sky-200 space-y-1">
+					<p className="font-medium">存储空间清理</p>
+					<p className="text-xs opacity-80">扫描 R2/S3 存储中所有文件，找出未被任何帖子、评论或用户头像引用的孤立文件并删除，释放存储空间。</p>
+					<p className="text-xs opacity-70">⚠️ 删除操作不可逆，请在分析后仔细确认再执行清理。</p>
+				</div>
+			</div>
+
+			{/* 操作按钮 */}
+			<div className="flex items-center gap-3">
+				<Button onClick={analyze} disabled={analyzing || cleaning} className="gap-2">
+					{analyzing
+						? <><RefreshCw className="h-4 w-4 animate-spin" />分析中…</>
+						: <><HardDrive className="h-4 w-4" />开始分析</>}
+				</Button>
+				{result && result.orphans.length > 0 && (
+					<Button
+						variant="destructive"
+						onClick={() => setConfirmOpen(true)}
+						disabled={cleaning}
+						className="gap-2"
+					>
+						{cleaning
+							? <><RefreshCw className="h-4 w-4 animate-spin" />清理中…</>
+							: <><Trash2 className="h-4 w-4" />清理 {result.orphans.length} 个文件</>}
+					</Button>
+				)}
+			</div>
+
+			{/* 分析结果 */}
+			{result && (
+				<div className="space-y-4">
+					{/* 统计卡片 */}
+					<div className="grid gap-3 sm:grid-cols-3">
+						{[
+							{ label: '存储文件总数', value: result.total_files, icon: '🗂️', color: 'from-sky/20 to-sky/5' },
+							{ label: '已使用文件', value: result.used_files, icon: '✅', color: 'from-emerald-500/20 to-emerald-500/5' },
+							{ label: '未使用文件', value: result.orphaned_files, icon: '🗑️', color: result.orphaned_files > 0 ? 'from-red-500/20 to-red-500/5' : 'from-muted/40 to-muted/10' },
+						].map(s => (
+							<div key={s.label} className={`rounded-2xl bg-gradient-to-br ${s.color} border border-sakura/20 p-4`}>
+								<div className="text-2xl mb-1">{s.icon}</div>
+								<div className="text-2xl font-bold font-display">{s.value}</div>
+								<div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
+							</div>
+						))}
+					</div>
+
+					{/* 孤立文件列表 */}
+					{result.orphans.length === 0 ? (
+						<div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-900/20 dark:border-emerald-700/40 p-4 flex items-center gap-3">
+							<CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+							<span className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">太棒了！存储中没有未使用的文件 🎉</span>
+						</div>
+					) : (
+						<div className="space-y-2">
+							<p className="text-sm font-medium text-muted-foreground">未使用文件列表（共 {result.orphans.length} 个）：</p>
+							<div className="rounded-xl border border-border bg-muted/30 max-h-64 overflow-y-auto">
+								<table className="w-full text-xs">
+									<tbody>
+										{result.orphans.map((key, i) => (
+											<tr key={key} className={i % 2 === 0 ? 'bg-transparent' : 'bg-muted/20'}>
+												<td className="px-3 py-1.5 font-mono text-muted-foreground break-all">{key}</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+						</div>
+					)}
+				</div>
+			)}
+
+			{/* 确认弹窗 */}
+			<ConfirmDialog
+				open={confirmOpen}
+				title="确认清理未使用文件"
+				description={`即将永久删除 ${result?.orphans.length ?? 0} 个未被引用的文件，此操作不可撤销，请确认继续。`}
+				confirmLabel="确认清理"
+				confirmVariant="destructive"
+				onConfirm={executeCleanup}
+				onCancel={() => setConfirmOpen(false)}
+			/>
+		</div>
+	);
+}
+
 // ─── 设置分组标题 ─────────────────────────────────────────────
 function SettingSection({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
 	return (
@@ -1203,6 +1342,7 @@ export function AdminPage() {
 		{ id: 'users',       icon: <Users className="h-4 w-4" />,         label: '用户管理' },
 		{ id: 'categories',  icon: <Tag className="h-4 w-4" />,           label: '分类管理' },
 		{ id: 'settings',    icon: <Settings className="h-4 w-4" />,      label: '系统设置' },
+		{ id: 'storage',     icon: <HardDrive className="h-4 w-4" />,     label: '存储清理' },
 	];
 
 	return (
@@ -1269,11 +1409,12 @@ export function AdminPage() {
 										<p className="text-sm text-muted-foreground">使用左侧导航管理帖子、评论、用户和系统设置。</p>
 									</div>
 								)}
-								{tab === 'posts'      && <PostsTab />}
-								{tab === 'comments'   && <CommentsTab />}
-								{tab === 'users'      && <UsersTab currentUserId={user?.id} />}
-								{tab === 'categories' && <CategoriesTab />}
-								{tab === 'settings'   && <SystemSettingsTab />}
+						{tab === 'posts'      && <PostsTab />}
+						{tab === 'comments'   && <CommentsTab />}
+						{tab === 'users'      && <UsersTab currentUserId={user?.id} />}
+						{tab === 'categories' && <CategoriesTab />}
+						{tab === 'settings'   && <SystemSettingsTab />}
+						{tab === 'storage'    && <StorageCleanupTab />}
 							</CardContent>
 						</Card>
 					</div>

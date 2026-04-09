@@ -140,7 +140,10 @@ export function SiteHeader({
 							{user ? (
 								<>
 									{/* 用户信息 */}
-									<span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+									<a
+										href={`/profile?id=${user.id}`}
+										className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+									>
 										{/* 头像 */}
 										<span className="avatar-anime transition-transform duration-300 hover:rotate-12">
 											{user.avatar_url ? (
@@ -166,7 +169,7 @@ export function SiteHeader({
 												{t.admin}
 											</span>
 										) : null}
-									</span>
+									</a>
 
 									{/* 管理后台按钮 */}
 									{user.role === 'admin' ? (

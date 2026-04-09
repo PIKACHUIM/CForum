@@ -370,32 +370,32 @@ export function PostPage() {
 <CardHeader className="rounded-t-2xl bg-gradient-to-r from-[#f43f8e]/10 via-[#a855f7]/10 to-[#38bdf8]/10 border-b border-[#f43f8e]/15">
 								<CardTitle className="flex flex-col gap-2">
 									<span className="font-display text-2xl bg-gradient-to-r from-[#f43f8e] to-[#a855f7] bg-clip-text text-transparent">{post.title}</span>
-									<span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-normal text-muted-foreground">
-										<span className="inline-flex items-center gap-2">
-											{post.author_avatar ? (
-												<img
-													src={post.author_avatar}
-													alt=""
-													className="h-6 w-6 rounded-full object-cover"
-													loading="lazy"
-													referrerPolicy="no-referrer"
-												/>
-											) : (
-												<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
-													<User className="h-4 w-4" />
-												</span>
-											)}
-											<span className="text-foreground">{post.author_name}</span>
-											{post.author_role === 'admin' ? (
-												<span className="inline-flex items-center gap-1 rounded border border-indigo-500/30 bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
-													<Shield className="h-3 w-3" />
-													<span className="sr-only">管理员</span>
-												</span>
-											) : null}
-										</span>
-										<span>·</span>
-										<span className="whitespace-nowrap">{formatDate(post.created_at)}</span>
+						<span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-normal text-muted-foreground">
+							<a href={`/profile?id=${post.author_id}`} className="inline-flex items-center gap-2 hover:text-primary transition-colors">
+								{post.author_avatar ? (
+									<img
+										src={post.author_avatar}
+										alt=""
+										className="h-6 w-6 rounded-full object-cover"
+										loading="lazy"
+										referrerPolicy="no-referrer"
+									/>
+								) : (
+									<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
+										<User className="h-4 w-4" />
 									</span>
+								)}
+								<span className="text-foreground">{post.author_name}</span>
+								{post.author_role === 'admin' ? (
+									<span className="inline-flex items-center gap-1 rounded border border-indigo-500/30 bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
+										<Shield className="h-3 w-3" />
+										<span className="sr-only">管理员</span>
+									</span>
+								) : null}
+							</a>
+							<span>·</span>
+							<span className="whitespace-nowrap">{formatDate(post.created_at)}</span>
+						</span>
 								</CardTitle>
 							</CardHeader>
 							<CardContent className="space-y-4">
@@ -591,33 +591,33 @@ export function PostPage() {
 									{organizeComments(comments).map((c) => (
 											<div key={c.id} className={`comment-bubble p-4 ${ (c as any).status === 'locked' ? 'opacity-60 border-orange-300/50' : '' }`}>
 													<div className="flex items-center justify-between gap-2">
-														<div className="text-sm">
-															<span className="inline-flex items-center gap-2">
-																<span className="avatar-anime">
-																{c.avatar_url ? (
-																	<img
-																		src={c.avatar_url}
-																		alt=""
-																		className="h-6 w-6 rounded-full object-cover"
-																		loading="lazy"
-																		referrerPolicy="no-referrer"
-																	/>
-																) : (
+											<div className="text-sm">
+												<a href={`/profile?id=${c.author_id}`} className="inline-flex items-center gap-2 hover:text-primary transition-colors">
+													<span className="avatar-anime">
+													{c.avatar_url ? (
+														<img
+															src={c.avatar_url}
+															alt=""
+															className="h-6 w-6 rounded-full object-cover"
+															loading="lazy"
+															referrerPolicy="no-referrer"
+														/>
+													) : (
 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#f43f8e] to-[#a855f7] text-white text-[10px]">
-																		<User className="h-4 w-4" />
-																	</span>
-																)}
-																</span>
-															<span className="font-medium text-foreground">{c.username}</span>
-															{c.role === 'admin' ? (
-																<span className="inline-flex items-center gap-1 rounded border border-indigo-500/30 bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
-																	<Shield className="h-3 w-3" />
-																	<span className="sr-only">管理员</span>
-																</span>
-															) : null}
-															<span className="text-muted-foreground">{formatDate(c.created_at)}</span>
-														</span>
-													</div>
+														<User className="h-4 w-4" />
+													</span>
+													)}
+													</span>
+												<span className="font-medium text-foreground">{c.username}</span>
+												{c.role === 'admin' ? (
+													<span className="inline-flex items-center gap-1 rounded border border-indigo-500/30 bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
+														<Shield className="h-3 w-3" />
+														<span className="sr-only">管理员</span>
+													</span>
+												) : null}
+												</a>
+												<span className="text-muted-foreground ml-1">{formatDate(c.created_at)}</span>
+											</div>
 													<div className="flex items-center gap-2">
 														<Button variant="ghost" size="sm" onClick={() => setReplyTo(c)}>
 															<Reply className="h-4 w-4" />

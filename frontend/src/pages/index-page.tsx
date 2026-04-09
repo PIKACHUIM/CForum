@@ -986,31 +986,31 @@ export function IndexPage() {
 														</div>
 													) : null}
 												</div>
-												<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-												<span className="inline-flex items-center gap-2">
-													<span className="avatar-anime">
-													{p.author_avatar ? (
-														<img
-															src={p.author_avatar}
-															alt=""
-															className="h-6 w-6 rounded-full object-cover"
-															loading="lazy"
-															referrerPolicy="no-referrer"
-														/>
-													) : (
+									<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+									<a href={`/profile?id=${p.author_id}`} className="inline-flex items-center gap-2 hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>
+										<span className="avatar-anime">
+										{p.author_avatar ? (
+											<img
+												src={p.author_avatar}
+												alt=""
+												className="h-6 w-6 rounded-full object-cover"
+												loading="lazy"
+												referrerPolicy="no-referrer"
+											/>
+										) : (
 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#f43f8e] to-[#a855f7] text-white text-[10px]">
-															<User className="h-3.5 w-3.5" />
-														</span>
-													)}
-													</span>
-														<span className="truncate text-foreground">{p.author_name}</span>
-														{p.author_role === 'admin' ? (
-															<span className="inline-flex items-center gap-1 rounded border border-indigo-500/30 bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
-																<Shield className="h-3 w-3" />
-																<span className="sr-only">管理员</span>
-															</span>
-														) : null}
-													</span>
+												<User className="h-3.5 w-3.5" />
+											</span>
+										)}
+										</span>
+											<span className="truncate text-foreground">{p.author_name}</span>
+											{p.author_role === 'admin' ? (
+												<span className="inline-flex items-center gap-1 rounded border border-indigo-500/30 bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
+													<Shield className="h-3 w-3" />
+													<span className="sr-only">管理员</span>
+												</span>
+											) : null}
+										</a>
 													{p.category_name ? (
 														<>
 															<span>·</span>
@@ -1118,16 +1118,16 @@ export function IndexPage() {
 											<p className="text-sm text-muted-foreground leading-relaxed">{excerpt}</p>
 										) : null}
 										<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-											<span className="inline-flex items-center gap-1.5">
-												<span className="avatar-anime">
-													{p.author_avatar ? (
-														<img src={p.author_avatar} alt="" className="h-5 w-5 rounded-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
-													) : (
+													<a href={`/profile?id=${p.author_id}`} className="inline-flex items-center gap-1.5 hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>
+														<span className="avatar-anime">
+															{p.author_avatar ? (
+																<img src={p.author_avatar} alt="" className="h-5 w-5 rounded-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
+															) : (
 <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-[#f43f8e] to-[#a855f7] text-white text-[9px]"><User className="h-3 w-3" /></span>
-													)}
-												</span>
-												<span className="text-foreground">{p.author_name}</span>
-											</span>
+															)}
+														</span>
+														<span className="text-foreground">{p.author_name}</span>
+													</a>
 											<span>·</span>
 											<span>{formatDate(p.created_at)}</span>
 										</div>

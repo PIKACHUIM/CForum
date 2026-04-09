@@ -21,6 +21,15 @@ export function SettingsPage() {
 	const [avatarUrl, setAvatarUrl] = React.useState(user?.avatar_url || '');
 	const [emailNotifications, setEmailNotifications] = React.useState<boolean>(user?.email_notifications !== false);
 
+	// 扩展个人资料字段
+	const [age, setAge] = React.useState<string>(user?.age != null ? String(user.age) : '');
+	const [gender, setGender] = React.useState<string>(user?.gender || '');
+	const [birthday, setBirthday] = React.useState<string>(user?.birthday || '');
+	const [attribute, setAttribute] = React.useState<string>(user?.attribute || '');
+	const [isNanliang, setIsNanliang] = React.useState<boolean>(user?.is_nanliang || false);
+	const [bio, setBio] = React.useState<string>(user?.bio || '');
+	const [bgImage, setBgImage] = React.useState<string>(user?.bg_image || '');
+
 	const [emailNew, setEmailNew] = React.useState('');
 	const [emailTotp, setEmailTotp] = React.useState('');
 
@@ -63,7 +72,14 @@ export function SettingsPage() {
 				headers: getSecurityHeaders('POST'),
 				body: JSON.stringify({
 					avatar_url: avatarUrl,
-					email_notifications: emailNotifications
+					email_notifications: emailNotifications,
+					age: age ? parseInt(age) : null,
+					gender: gender || null,
+					birthday: birthday || null,
+					attribute: attribute || null,
+					is_nanliang: isNanliang,
+					bio: bio || null,
+					bg_image: bgImage || null
 				})
 			});
 			setUser(data.user);
@@ -99,6 +115,35 @@ export function SettingsPage() {
 			const data = (await res.json()) as any;
 					if (!res.ok) throw new Error(data?.error || t.uploadFailed);
 			setAvatarUrl(data.url);
+		} catch (e: any) {
+			setError(String(e?.message || e));
+		} finally {
+			setLoading(false);
+		}
+	}
+
+	async function uploadBgImage(file: File) {
+		if (!user) return;
+		setError('');
+		setLoading(true);
+		try {
+			const compressed = await imageCompression(file, {
+				maxSizeMB: 4,
+				maxWidthOrHeight: 2560,
+				useWebWorker: true,
+				initialQuality: 0.7,
+			});
+			const formData = new FormData();
+			formData.append('file', compressed, file.name);
+			formData.append('type', 'bg');
+			const res = await fetch('/api/upload', {
+				method: 'POST',
+				headers: getSecurityHeaders('POST', null),
+				body: formData
+			});
+			const data = (await res.json()) as any;
+			if (!res.ok) throw new Error(data?.error || t.uploadFailed);
+			setBgImage(data.url);
 		} catch (e: any) {
 			setError(String(e?.message || e));
 		} finally {
@@ -245,7 +290,7 @@ export function SettingsPage() {
 				<CardHeader>
 					<CardTitle>{t.profileCard}</CardTitle>
 				</CardHeader>
-					<CardContent className="space-y-4">
+			<CardContent className="space-y-4">
 				<div className="grid gap-4 sm:grid-cols-2">
 				<div className="space-y-2">
 					<Label>{t.usernameLabel}</Label>
@@ -273,6 +318,119 @@ export function SettingsPage() {
 								}}
 							/>
 						</div>
+
+				{/* 扩展个人资料字段 */}
+				<div className="grid gap-4 sm:grid-cols-3">
+					<div className="space-y-2">
+						<Label htmlFor="profile-age">年龄</Label>
+						<Input
+							id="profile-age"
+							type="number"
+							min={1}
+							max={150}
+							placeholder="请输入年龄"
+							value={age}
+							onChange={(e) => setAge(e.target.value)}
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="profile-gender">性别</Label>
+						<select
+							id="profile-gender"
+							className="flex h-10 w-full rounded-xl border-2 border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+							value={gender}
+							onChange={(e) => setGender(e.target.value)}
+						>
+							<option value="">不填写</option>
+							<option value="male">男</option>
+							<option value="female">女</option>
+							<option value="other">其他</option>
+						</select>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="profile-birthday">生日</Label>
+						<Input
+							id="profile-birthday"
+							type="date"
+							value={birthday}
+							onChange={(e) => setBirthday(e.target.value)}
+						/>
+					</div>
+				</div>
+
+				<div className="grid gap-4 sm:grid-cols-2">
+					<div className="space-y-2">
+						<Label htmlFor="profile-attribute">属性</Label>
+						<select
+							id="profile-attribute"
+							className="flex h-10 w-full rounded-xl border-2 border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+							value={attribute}
+							onChange={(e) => setAttribute(e.target.value)}
+						>
+							<option value="">不填写</option>
+							<option value="s">S</option>
+							<option value="m">M</option>
+						</select>
+					</div>
+					<div className="space-y-2 flex flex-col justify-end">
+						<label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+							<input
+								type="checkbox"
+								className="h-4 w-4 accent-pink-500"
+								checked={isNanliang}
+								onChange={(e) => setIsNanliang(e.target.checked)}
+							/>
+							<span className="font-medium">是否南梁 🌸</span>
+						</label>
+					</div>
+				</div>
+
+				<div className="space-y-2">
+					<Label htmlFor="profile-bio">个人介绍</Label>
+					<textarea
+						id="profile-bio"
+						className="flex min-h-[80px] w-full rounded-xl border-2 border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+						placeholder="介绍一下自己吧..."
+						maxLength={500}
+						value={bio}
+						onChange={(e) => setBio(e.target.value)}
+					/>
+					<p className="text-xs text-muted-foreground text-right">{bio.length}/500</p>
+				</div>
+
+				<div className="space-y-2">
+					<Label htmlFor="profile-bg-url">背景图 URL</Label>
+					<Input
+						id="profile-bg-url"
+						placeholder="https://..."
+						value={bgImage}
+						onChange={(e) => setBgImage(e.target.value)}
+					/>
+				</div>
+
+				<div className="space-y-2">
+					<Label htmlFor="bg-file">上传背景图</Label>
+					<Input
+						id="bg-file"
+						type="file"
+						accept="image/*"
+						onChange={(e) => {
+							const f = e.target.files?.[0];
+							if (f) uploadBgImage(f);
+							e.target.value = '';
+						}}
+					/>
+					{bgImage && (
+						<div className="relative mt-2 rounded-xl overflow-hidden h-24 border border-border">
+							<img src={bgImage} alt="背景图预览" className="w-full h-full object-cover" />
+							<button
+								type="button"
+								className="absolute top-1 right-1 bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-black/70"
+								onClick={() => setBgImage('')}
+							>✕</button>
+						</div>
+					)}
+				</div>
 
 					<label className="flex items-center gap-2 text-sm">
 						<input
