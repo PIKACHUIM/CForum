@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useConfig } from '@/hooks/use-config';
+import { useI18n } from '@/hooks/use-i18n';
 import { apiFetch, formatDate, getSecurityHeaders, type Category, type Comment, type Post } from '@/lib/api';
 import { getToken, getUser } from '@/lib/auth';
 import { attachFancybox, highlightCodeBlocks, renderMarkdownToHtml } from '@/lib/markdown';
@@ -17,6 +18,7 @@ export function PostPage() {
 	const token = getToken();
 	const user = React.useMemo(() => getUser(), [token]);
 	const { config } = useConfig();
+	const { t } = useI18n();
 	const enabled = !!config?.turnstile_enabled;
 	const siteKey = config?.turnstile_site_key || '';
 	const turnstileActive = enabled && !!siteKey;
@@ -82,7 +84,7 @@ export function PostPage() {
 
 	const refresh = React.useCallback(async () => {
 		if (!postId) {
-			setError('帖子不存在');
+			setError(t.postNotFound);
 			setLoading(false);
 			return;
 		}
@@ -193,10 +195,10 @@ export function PostPage() {
 			return;
 		}
 		setCommentError('');
-		const err = validateText(newComment, '评论');
+		const err = validateText(newComment, t.comments);
 		if (err) return setCommentError(err);
-		if (newComment.length > 3000) return setCommentError('评论过长 (最多 3000 字符)');
-		if (turnstileActive && !turnstileToken) return setCommentError('请完成验证码验证');
+		if (newComment.length > 3000) return setCommentError(t.commentTooLong);
+		if (turnstileActive && !turnstileToken) return setCommentError(t.completeCaptcha);
 
 		setCommentLoading(true);
 		try {
@@ -224,7 +226,7 @@ export function PostPage() {
 	}
 
 	async function deleteComment(id: number) {
-		if (!confirm('确定要删除此评论吗？此操作无法撤销。')) return;
+		if (!confirm(t.confirmDeleteComment)) return;
 		try {
 			await apiFetch(`/comments/${id}`, {
 				method: 'DELETE',
@@ -238,7 +240,7 @@ export function PostPage() {
 
 	async function deletePost() {
 		if (!post) return;
-		if (!confirm('确定要删除这个帖子吗？此操作无法撤销。')) return;
+		if (!confirm(t.confirmDeletePost)) return;
 		try {
 			const isAdmin = user?.role === 'admin';
 			const path = isAdmin ? `/admin/posts/${post.id}` : `/posts/${post.id}`;
@@ -289,12 +291,12 @@ export function PostPage() {
 	async function saveEdit() {
 		if (!post) return;
 		setEditError('');
-		const titleErr = validateText(editTitle, '标题');
+		const titleErr = validateText(editTitle, t.postTitle);
 		if (titleErr) return setEditError(titleErr);
-		const contentErr = validateText(editContent, '内容');
+		const contentErr = validateText(editContent, t.postContent);
 		if (contentErr) return setEditError(contentErr);
-		if (editTitle.length > 30) return setEditError('标题过长 (最多 30 字符)');
-		if (editContent.length > 3000) return setEditError('内容过长 (最多 3000 字符)');
+		if (editTitle.length > 30) return setEditError(t.titleTooLong);
+		if (editContent.length > 3000) return setEditError(t.contentTooLong);
 
 		setEditLoading(true);
 		try {
@@ -335,7 +337,7 @@ export function PostPage() {
 									<span className="animate-heartbeat" style={{animationDelay:'0.2s'}}>💖</span>
 									<span className="animate-twinkle" style={{animationDelay:'0.4s'}}>✨</span>
 								</div>
-								<p className="text-sm text-muted-foreground font-display animate-pulse">加载中...</p>
+				<p className="text-sm text-muted-foreground font-display animate-pulse">{t.loading}</p>
 							</div>
 						</CardContent>
 					</Card>
@@ -343,26 +345,26 @@ export function PostPage() {
 					<Card>
 						<CardContent className="py-10 text-center">
 							<span className="text-4xl block mb-3">💔</span>
-							<p className="text-sm text-muted-foreground">帖子不存在或已被删除</p>
+				<p className="text-sm text-muted-foreground">{t.postNotFound}</p>
 						</CardContent>
 					</Card>
 				) : (
 					<>
 						{/* 帖子状态提示 */}
-						{(post as any).status === 'locked' && (
-							<div className="rounded-xl border border-orange-400/40 bg-orange-50/80 dark:bg-orange-900/20 px-4 py-3 text-sm text-orange-700 dark:text-orange-300 flex items-center gap-2">
-								<span>🔒</span>
-								{user && user.id === (post as any).author_id
-									? '您的帖子正在审核中，暂时仅您可见。'
-									: '该帖子已锁定，无法发表新评论。'
-								}
-							</div>
-						)}
-						{(post as any).status === 'hidden' && user?.role === 'admin' && (
-							<div className="rounded-xl border border-amber-400/40 bg-amber-50/80 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2">
-								<span>👁️</span> 该帖子已被隐藏，仅管理员可见。
-							</div>
-						)}
+					{(post as any).status === 'locked' && (
+						<div className="rounded-xl border border-orange-400/40 bg-orange-50/80 dark:bg-orange-900/20 px-4 py-3 text-sm text-orange-700 dark:text-orange-300 flex items-center gap-2">
+							<span>🔒</span>
+							{user && user.id === (post as any).author_id
+								? t.postLockedOwner
+								: t.postLocked
+							}
+						</div>
+					)}
+					{(post as any).status === 'hidden' && user?.role === 'admin' && (
+						<div className="rounded-xl border border-amber-400/40 bg-amber-50/80 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2">
+							<span>👁️</span> {t.postHiddenAdmin}
+						</div>
+					)}
 						<Card>
 							<CardHeader className="rounded-t-2xl bg-gradient-to-r from-sakura/15 via-lavender/15 to-sky/15 border-b border-sakura/20">
 								<CardTitle className="flex flex-col gap-2">
@@ -400,20 +402,20 @@ export function PostPage() {
 									<Button variant={post.liked ? 'secondary' : 'outline'} size="sm" onClick={toggleLike} disabled={!user}>
 										<Heart className="h-4 w-4 text-rose-600" fill={post.liked ? 'currentColor' : 'none'} />
 										<span className="tabular-nums">{post.like_count || 0}</span>
-										<span className="sr-only">{post.liked ? '取消点赞' : '点赞'}</span>
+										<span className="sr-only">{post.liked ? t.unlike : t.likes}</span>
 									</Button>
 									<span className="inline-flex items-center gap-1 rounded-md border bg-muted/20 px-2 py-1 text-xs text-muted-foreground">
 										<Eye className="h-4 w-4 text-emerald-600" />
 										<span className="tabular-nums">{post.view_count || 0}</span>
-										<span className="sr-only">观看数</span>
+										<span className="sr-only">{t.views}</span>
 									</span>
 
 									{user && (user.role === 'admin' || user.id === post.author_id) ? (
 										<>
-											<Button variant="outline" size="sm" onClick={() => setIsEditing((v) => !v)}>
-												{isEditing ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-												<span className="sr-only">{isEditing ? '取消编辑' : '编辑'}</span>
-											</Button>
+										<Button variant="outline" size="sm" onClick={() => setIsEditing((v) => !v)}>
+											{isEditing ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+											<span className="sr-only">{isEditing ? t.cancelEdit : t.edit}</span>
+										</Button>
 										</>
 									) : null}
 
@@ -432,38 +434,38 @@ export function PostPage() {
 											</Button>
 											{adminMenuOpen ? (
 												<div className="absolute right-0 top-full z-50 mt-2 w-44 rounded-md border bg-background p-1 shadow-md">
-													{user.role === 'admin' ? (
-														<button
-															type="button"
-															className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
-															onClick={togglePin}
-														>
-															<Pin className="h-4 w-4" />
-															{post.is_pinned ? '取消置顶' : '置顶'}
-														</button>
-													) : null}
+											{user.role === 'admin' ? (
+												<button
+													type="button"
+													className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
+													onClick={togglePin}
+												>
+													<Pin className="h-4 w-4" />
+													{post.is_pinned ? t.unpinPost : t.togglePin}
+												</button>
+											) : null}
+											<button
+												type="button"
+												className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
+												onClick={() => {
+													setAdminMenuOpen(false);
+													void deletePost();
+												}}
+											>
+												<Trash2 className="h-4 w-4" />
+												{t.deletePost}
+											</button>
+											{user.role === 'admin' ? (
+												<>
+													<div className="my-1 h-px bg-border" />
+													<div className="px-2 py-1 text-xs font-medium text-muted-foreground">{t.moveToCategory}</div>
 													<button
 														type="button"
-														className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
-														onClick={() => {
-															setAdminMenuOpen(false);
-															void deletePost();
-														}}
+														className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
+														onClick={() => void adminMovePostCategory(null)}
 													>
-														<Trash2 className="h-4 w-4" />
-														删除
+														{t.uncategorized}
 													</button>
-													{user.role === 'admin' ? (
-														<>
-															<div className="my-1 h-px bg-border" />
-															<div className="px-2 py-1 text-xs font-medium text-muted-foreground">移动到分类</div>
-															<button
-																type="button"
-																className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
-																onClick={() => void adminMovePostCategory(null)}
-															>
-																未分类
-															</button>
 															{allCategories.map((c) => (
 																<button
 																	key={c.id}
@@ -490,16 +492,16 @@ export function PostPage() {
 										</div>
 										<div className="space-y-2">
 											<div className="flex items-center justify-end">
-												<Button type="button" variant="outline" size="sm" onClick={() => setEditPreviewOpen((v) => !v)}>
-													{editPreviewOpen ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-													<span className="sr-only">{editPreviewOpen ? '关闭预览' : '打开预览'}</span>
-												</Button>
+									<Button type="button" variant="outline" size="sm" onClick={() => setEditPreviewOpen((v) => !v)}>
+										{editPreviewOpen ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+										<span className="sr-only">{editPreviewOpen ? t.closePreview : t.openPreview}</span>
+									</Button>
 											</div>
 											<Textarea ref={editContentRef} value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={10} />
 										</div>
                         {/* upload image when editing */}
                         <div className="space-y-2">
-                            <label className="block text-sm font-medium text-muted-foreground">上传图片</label>
+                            <label className="block text-sm font-medium text-muted-foreground">{t.uploadImage}</label>
                             <input
                                 type="file"
                                 accept="image/*"
@@ -509,7 +511,7 @@ export function PostPage() {
                                     if (!file) return;
                                     setEditError('');
                                     if (file.size > 2 * 1024 * 1024) {
-                                        setEditError('文件过大 (最大 2MB)');
+                                        setEditError(t.fileTooLarge);
                                         return;
                                     }
                                     setUploadLoading(true);
@@ -523,7 +525,7 @@ export function PostPage() {
                                             body: formData,
                                         });
                                         const data = await res.json();
-                                        if (!res.ok) throw new Error(data?.error || '上传失败');
+                                        if (!res.ok) throw new Error(data?.error || t.uploadFailed);
                                         // insert link at cursor and show preview
                                         insertIntoEditContent(`
 
@@ -539,11 +541,11 @@ export function PostPage() {
                                 }}
                             />
                             {uploadError ? <div className="text-sm text-destructive">{uploadError}</div> : null}
-                            {uploadLoading ? <div className="text-sm text-muted-foreground">上传中…</div> : null}
+                            {uploadLoading ? <div className="text-sm text-muted-foreground">{t.uploading}</div> : null}
                         </div>
 										{editPreviewOpen ? (
 <div className="rounded-md border bg-muted/20 p-3">
-												<div className="mb-2 text-xs font-medium text-muted-foreground">预览</div>
+										<div className="mb-2 text-xs font-medium text-muted-foreground">{t.preview}</div>
 												<div
 													ref={editPreviewRef}
 													className="prose max-w-none break-words [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1"
@@ -551,9 +553,9 @@ export function PostPage() {
 												/>
 											</div>
 										) : null}
-										<Button onClick={saveEdit} disabled={editLoading}>
-											{editLoading ? '保存中...' : '保存'}
-										</Button>
+									<Button onClick={saveEdit} disabled={editLoading}>
+										{editLoading ? t.savingEdit : t.saveEdit}
+									</Button>
 									</div>
 								) : (
 									<div
@@ -567,19 +569,19 @@ export function PostPage() {
 
 							<Card>
 							<CardHeader className="rounded-t-2xl bg-gradient-to-r from-lavender/15 to-sky/15 border-b border-lavender/20">
-								<CardTitle className="font-display flex items-center gap-2">
-									<span>💬</span> 评论
-									{(post as any).status === 'locked' && (
-										<span className="ml-auto text-xs font-normal text-orange-600 flex items-center gap-1"><span>🔒</span>已锁定</span>
-									)}
+							<CardTitle className="font-display flex items-center gap-2">
+								<span>💬</span> {t.comments}
+								{(post as any).status === 'locked' && (
+									<span className="ml-auto text-xs font-normal text-orange-600 flex items-center gap-1"><span>🔒</span>{t.commentsLocked}</span>
+								)}
 								</CardTitle>
 							</CardHeader>
 								<CardContent className="space-y-4">
-									{comments.length === 0 ? (
-										<div className="text-center py-6">
-											<span className="text-3xl block mb-2">🌸</span>
-											<p className="text-sm text-muted-foreground">暂无评论，快来发表第一条吧！</p>
-										</div>
+								{comments.length === 0 ? (
+									<div className="text-center py-6">
+										<span className="text-3xl block mb-2">🌸</span>
+										<p className="text-sm text-muted-foreground">{t.noComments}</p>
+									</div>
 								) : (
 									<div className="space-y-3">
 									{organizeComments(comments).map((c) => (
@@ -625,9 +627,9 @@ export function PostPage() {
 														) : null}
 													</div>
 												</div>
-											{(c as any).status === 'locked' && user?.id === c.author_id && (
-												<div className="mt-1 text-xs text-orange-600 flex items-center gap-1"><span>🔒</span>评论正在审核中，暂时仅您可见</div>
-											)}
+									{(c as any).status === 'locked' && user?.id === c.author_id && (
+										<div className="mt-1 text-xs text-orange-600 flex items-center gap-1"><span>🔒</span>{t.commentUnderReview}</div>
+									)}
 											<div className="mt-2 whitespace-pre-wrap text-sm">{c.content}</div>
 													{c.replies && c.replies.length ? (
 														<div className="mt-3 space-y-2 border-l-2 border-sakura/30 pl-4">
@@ -676,34 +678,34 @@ export function PostPage() {
 									</div>
 								)}
 
-									{replyTo ? (
-										<div className="flex items-center justify-between rounded-xl border-2 border-sakura/30 bg-sakura/5 p-3 text-sm">
-											<span className="flex items-center gap-2">
-												<span>💬</span>
-												回复 <span className="font-medium text-primary">{replyTo.username}</span>
-											</span>
-										<Button variant="ghost" size="sm" onClick={() => setReplyTo(null)}>
-											取消
-										</Button>
-									</div>
+								{replyTo ? (
+									<div className="flex items-center justify-between rounded-xl border-2 border-sakura/30 bg-sakura/5 p-3 text-sm">
+										<span className="flex items-center gap-2">
+											<span>💬</span>
+											{t.replyTo} <span className="font-medium text-primary">{replyTo.username}</span>
+										</span>
+									<Button variant="ghost" size="sm" onClick={() => setReplyTo(null)}>
+										{t.cancelReply}
+									</Button>
+								</div>
 								) : null}
 
-									{(post as any).status === 'locked' ? (
-										<div className="rounded-xl border border-orange-300/40 bg-orange-50/60 dark:bg-orange-900/10 px-4 py-3 text-sm text-orange-600 text-center">
-											🔒 该帖子已锁定，无法发表评论
-										</div>
-									) : (
-									<form className="space-y-3" onSubmit={submitComment}>
-										{commentError ? <div className="rounded-xl border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">{commentError}</div> : null}
-										<Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} rows={4} placeholder="写下你的评论... 🌸" />
-										<TurnstileWidget enabled={turnstileActive} siteKey={siteKey} onToken={setTurnstileToken} resetKey={turnstileResetKey} />
-										<div className="flex items-center gap-2">
-											<Button type="submit" disabled={commentLoading}>
-												{commentLoading ? '🌸 发布中...' : '💬 发布评论'}
-											</Button>
+								{(post as any).status === 'locked' ? (
+									<div className="rounded-xl border border-orange-300/40 bg-orange-50/60 dark:bg-orange-900/10 px-4 py-3 text-sm text-orange-600 text-center">
+										{t.lockedNoComment}
+									</div>
+								) : (
+								<form className="space-y-3" onSubmit={submitComment}>
+									{commentError ? <div className="rounded-xl border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">{commentError}</div> : null}
+									<Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} rows={4} placeholder={t.commentPlaceholder} />
+									<TurnstileWidget enabled={turnstileActive} siteKey={siteKey} onToken={setTurnstileToken} resetKey={turnstileResetKey} />
+									<div className="flex items-center gap-2">
+										<Button type="submit" disabled={commentLoading}>
+											{commentLoading ? t.postingComment : t.postComment}
+										</Button>
 									{!user ? (
 										<Button type="button" variant="outline" onClick={() => (window.location.href = '/login')}>
-											登录后评论
+											{t.loginToComment}
 										</Button>
 									) : null}
 									</div>

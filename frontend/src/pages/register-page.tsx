@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useConfig } from '@/hooks/use-config';
+import { useI18n } from '@/hooks/use-i18n';
 import { getSecurityHeaders } from '@/lib/api';
 
 // 默认用户协议
@@ -72,6 +73,7 @@ const DEFAULT_PRIVACY = `隐私政策
 
 // 协议弹窗组件
 function PolicyModal({ title, content, onClose }: { title: string; content: string; onClose: () => void }) {
+	const { t } = useI18n();
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
 			<div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
@@ -84,7 +86,7 @@ function PolicyModal({ title, content, onClose }: { title: string; content: stri
 					<pre className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed font-sans">{content}</pre>
 				</div>
 				<div className="px-5 py-3 border-t border-sakura/20">
-					<Button size="sm" className="w-full" onClick={onClose}>我已阅读</Button>
+					<Button size="sm" className="w-full" onClick={onClose}>{t.iHaveRead}</Button>
 				</div>
 			</div>
 		</div>
@@ -93,6 +95,7 @@ function PolicyModal({ title, content, onClose }: { title: string; content: stri
 
 export function RegisterPage() {
 	const { config } = useConfig();
+	const { t } = useI18n();
 	const [email, setEmail] = React.useState('');
 	const [username, setUsername] = React.useState('');
 	const [password, setPassword] = React.useState('');
@@ -118,11 +121,11 @@ export function RegisterPage() {
 		setError('');
 		setSuccess('');
 		if (!agreeTerms || !agreePrivacy) {
-			setError('请先阅读并同意用户协议和隐私政策');
+			setError(t.mustAgree);
 			return;
 		}
 		if (turnstileActive && !turnstileToken) {
-			setError('请完成验证码验证');
+			setError(t.completeCaptcha);
 			return;
 		}
 
@@ -142,9 +145,9 @@ export function RegisterPage() {
 			if (!res.ok) {
 				setTurnstileToken('');
 				setTurnstileResetKey((v) => v + 1);
-				throw new Error(data?.error || '注册失败');
+				throw new Error(data?.error || t.registerFailed);
 			}
-			setSuccess('注册成功！请前往邮箱完成验证后再登录。');
+			setSuccess(t.registerSuccess);
 			setEmail('');
 			setUsername('');
 			setPassword('');
@@ -159,18 +162,18 @@ export function RegisterPage() {
 
 	return (
 		<AuthPageShell>
-			{showTerms && <PolicyModal title="用户协议" content={termsContent} onClose={() => setShowTerms(false)} />}
-			{showPrivacy && <PolicyModal title="隐私政策" content={privacyContent} onClose={() => setShowPrivacy(false)} />}
+		{showTerms && <PolicyModal title={t.termsTitle} content={termsContent} onClose={() => setShowTerms(false)} />}
+		{showPrivacy && <PolicyModal title={t.privacyTitle} content={privacyContent} onClose={() => setShowPrivacy(false)} />}
 
 			<AuthCard>
 				<div className="p-8">
 					{/* 标题 */}
 					<div className="text-center mb-8">
 						<div className="text-4xl mb-3 animate-bounce-gentle">✨</div>
-						<h1 className="font-display text-2xl font-bold bg-gradient-to-r from-[#e879a0] to-[#a855f7] bg-clip-text text-transparent">
-							加入我们
-						</h1>
-						<p className="text-sm text-muted-foreground mt-1">创建你的账号</p>
+					<h1 className="font-display text-2xl font-bold bg-gradient-to-r from-[#e879a0] to-[#a855f7] bg-clip-text text-transparent">
+						{t.joinUs}
+					</h1>
+					<p className="text-sm text-muted-foreground mt-1">{t.registerSubtitle}</p>
 					</div>
 
 					<form className="space-y-5" onSubmit={handleSubmit}>
@@ -185,22 +188,22 @@ export function RegisterPage() {
 							</div>
 						) : null}
 
-						<div className="space-y-2">
-							<Label htmlFor="register-username">用户名 <span className="text-muted-foreground text-xs">(最多 20 字符)</span></Label>
-							<Input
-								id="register-username"
-								name="username"
-								type="text"
-								maxLength={20}
-								value={username}
-								onChange={(e) => setUsername(e.target.value)}
-								placeholder="你的昵称"
-								required
-							/>
-						</div>
+					<div className="space-y-2">
+						<Label htmlFor="register-username">{t.username} <span className="text-muted-foreground text-xs">{t.usernameMaxLen}</span></Label>
+						<Input
+							id="register-username"
+							name="username"
+							type="text"
+							maxLength={20}
+							value={username}
+							onChange={(e) => setUsername(e.target.value)}
+							placeholder={t.nickname}
+							required
+						/>
+					</div>
 
-						<div className="space-y-2">
-							<Label htmlFor="register-email">邮箱</Label>
+					<div className="space-y-2">
+						<Label htmlFor="register-email">{t.email}</Label>
 							<Input
 								id="register-email"
 								name="email"
@@ -213,8 +216,8 @@ export function RegisterPage() {
 							/>
 						</div>
 
-						<div className="space-y-2">
-							<Label htmlFor="register-password">密码 <span className="text-muted-foreground text-xs">(8-16 字符)</span></Label>
+					<div className="space-y-2">
+						<Label htmlFor="register-password">{t.password} <span className="text-muted-foreground text-xs">{t.passwordLen}</span></Label>
 							<Input
 								id="register-password"
 								name="password"
@@ -227,61 +230,61 @@ export function RegisterPage() {
 							/>
 						</div>
 
-						{/* 用户协议勾选 */}
-						<div className="space-y-3 rounded-xl border border-sakura/20 bg-sakura/5 p-3">
-							<label className="flex items-start gap-2.5 cursor-pointer group">
-								<input
-									type="checkbox"
-									className="mt-0.5 h-4 w-4 rounded border-sakura/40 accent-pink-500 cursor-pointer"
-									checked={agreeTerms}
-									onChange={(e) => setAgreeTerms(e.target.checked)}
-								/>
-								<span className="text-sm text-muted-foreground leading-relaxed">
-									我已阅读并同意{' '}
-									<button
-										type="button"
-										className="text-primary hover:underline font-medium"
-										onClick={() => setShowTerms(true)}
-									>
-										《用户协议》
-									</button>
-								</span>
-							</label>
-							<label className="flex items-start gap-2.5 cursor-pointer group">
-								<input
-									type="checkbox"
-									className="mt-0.5 h-4 w-4 rounded border-sakura/40 accent-pink-500 cursor-pointer"
-									checked={agreePrivacy}
-									onChange={(e) => setAgreePrivacy(e.target.checked)}
-								/>
-								<span className="text-sm text-muted-foreground leading-relaxed">
-									我已阅读并同意{' '}
-									<button
-										type="button"
-										className="text-primary hover:underline font-medium"
-										onClick={() => setShowPrivacy(true)}
-									>
-										《隐私政策》
-									</button>
-								</span>
-							</label>
-						</div>
+					{/* 用户协议勾选 */}
+					<div className="space-y-3 rounded-xl border border-sakura/20 bg-sakura/5 p-3">
+						<label className="flex items-start gap-2.5 cursor-pointer group">
+							<input
+								type="checkbox"
+								className="mt-0.5 h-4 w-4 rounded border-sakura/40 accent-pink-500 cursor-pointer"
+								checked={agreeTerms}
+								onChange={(e) => setAgreeTerms(e.target.checked)}
+							/>
+							<span className="text-sm text-muted-foreground leading-relaxed">
+								{t.agreeTerms}{' '}
+								<button
+									type="button"
+									className="text-primary hover:underline font-medium"
+									onClick={() => setShowTerms(true)}
+								>
+									{t.termsLink}
+								</button>
+							</span>
+						</label>
+						<label className="flex items-start gap-2.5 cursor-pointer group">
+							<input
+								type="checkbox"
+								className="mt-0.5 h-4 w-4 rounded border-sakura/40 accent-pink-500 cursor-pointer"
+								checked={agreePrivacy}
+								onChange={(e) => setAgreePrivacy(e.target.checked)}
+							/>
+							<span className="text-sm text-muted-foreground leading-relaxed">
+								{t.agreeTerms}{' '}
+								<button
+									type="button"
+									className="text-primary hover:underline font-medium"
+									onClick={() => setShowPrivacy(true)}
+								>
+									{t.privacyLink}
+								</button>
+							</span>
+						</label>
+					</div>
 
 						<TurnstileWidget enabled={turnstileActive} siteKey={siteKey} onToken={setTurnstileToken} resetKey={turnstileResetKey} />
 
-						<Button
-							className="w-full"
-							type="submit"
-							disabled={loading || !agreeTerms || !agreePrivacy}
-						>
-							{loading ? '🌸 注册中...' : '✨ 注册'}
-						</Button>
+					<Button
+						className="w-full"
+						type="submit"
+						disabled={loading || !agreeTerms || !agreePrivacy}
+					>
+						{loading ? t.registering : t.registerBtn}
+					</Button>
 
-						<div className="text-sm text-center pt-1">
-							<a className="text-muted-foreground hover:text-primary transition-colors hover:underline" href="/login">
-								已有账号？登录
-							</a>
-						</div>
+					<div className="text-sm text-center pt-1">
+						<a className="text-muted-foreground hover:text-primary transition-colors hover:underline" href="/login">
+							{t.hasAccount}
+						</a>
+					</div>
 					</form>
 				</div>
 			</AuthCard>

@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useConfig } from '@/hooks/use-config';
+import { useI18n } from '@/hooks/use-i18n';
 import { getSecurityHeaders } from '@/lib/api';
 import { setToken, setUser } from '@/lib/auth';
 
 export function LoginPage() {
 	const { config } = useConfig();
+	const { t } = useI18n();
 	const [email, setEmail] = React.useState('');
 	const [password, setPassword] = React.useState('');
 	const [totpCode, setTotpCode] = React.useState('');
@@ -27,7 +29,7 @@ export function LoginPage() {
 		e.preventDefault();
 		setError('');
 		if (turnstileActive && !turnstileToken) {
-			setError('请完成验证码验证');
+			setError(t.completeCaptcha);
 			return;
 		}
 		setLoading(true);
@@ -47,10 +49,10 @@ export function LoginPage() {
 				setTurnstileToken('');
 				setTurnstileResetKey((v) => v + 1);
 				if (data?.error === 'TOTP_REQUIRED') {
-					setError('请输入 2FA 验证码');
+					setError(t.twoFARequired);
 					return;
 				}
-				throw new Error(data?.error || '登录失败');
+				throw new Error(data?.error || t.loginFailed);
 			}
 
 			setUser(data.user);
@@ -71,9 +73,9 @@ export function LoginPage() {
 					<div className="text-center mb-8">
 						<div className="text-4xl mb-3 animate-bounce-gentle">🌸</div>
 						<h1 className="font-display text-2xl font-bold bg-gradient-to-r from-[#e879a0] to-[#a855f7] bg-clip-text text-transparent">
-							欢迎回来
+							{t.welcomeBack}
 						</h1>
-						<p className="text-sm text-muted-foreground mt-1">登录你的账号</p>
+						<p className="text-sm text-muted-foreground mt-1">{t.loginSubtitle}</p>
 					</div>
 
 					<form className="space-y-5" onSubmit={handleSubmit}>
@@ -84,7 +86,7 @@ export function LoginPage() {
 						) : null}
 
 						<div className="space-y-2">
-							<Label htmlFor="login-email">邮箱</Label>
+							<Label htmlFor="login-email">{t.email}</Label>
 							<Input
 								id="login-email"
 								name="email"
@@ -98,7 +100,7 @@ export function LoginPage() {
 						</div>
 
 						<div className="space-y-2">
-							<Label htmlFor="login-password">密码</Label>
+							<Label htmlFor="login-password">{t.password}</Label>
 							<Input
 								id="login-password"
 								name="password"
@@ -112,7 +114,7 @@ export function LoginPage() {
 						</div>
 
 						<div className="space-y-2">
-							<Label htmlFor="login-totp">双重验证码 <span className="text-muted-foreground text-xs">(若开启)</span></Label>
+							<Label htmlFor="login-totp">{t.twoFACode} <span className="text-muted-foreground text-xs">{t.twoFAOptional}</span></Label>
 							<Input
 								id="login-totp"
 								name="totp_code"
@@ -120,7 +122,7 @@ export function LoginPage() {
 								inputMode="numeric"
 								pattern="\d*"
 								maxLength={6}
-								placeholder="选填"
+								placeholder={t.optional}
 								autoComplete="one-time-code"
 								value={totpCode}
 								onChange={(e) => setTotpCode(e.target.value)}
@@ -130,15 +132,15 @@ export function LoginPage() {
 						<TurnstileWidget enabled={turnstileActive} siteKey={siteKey} onToken={setTurnstileToken} resetKey={turnstileResetKey} />
 
 						<Button className="w-full" type="submit" disabled={loading}>
-							{loading ? '🌸 登录中...' : '✨ 登录'}
+							{loading ? t.loggingIn : t.loginBtn}
 						</Button>
 
 						<div className="flex justify-between text-sm pt-1">
 							<a className="text-muted-foreground hover:text-primary transition-colors hover:underline" href="/register">
-								没有账号？注册
+								{t.noAccount}
 							</a>
 							<a className="text-muted-foreground hover:text-primary transition-colors hover:underline" href="/forgot">
-								忘记密码？
+								{t.forgotPassword}
 							</a>
 						</div>
 					</form>

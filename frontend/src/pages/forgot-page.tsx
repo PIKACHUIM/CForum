@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useConfig } from '@/hooks/use-config';
+import { useI18n } from '@/hooks/use-i18n';
 import { getSecurityHeaders } from '@/lib/api';
 
 export function ForgotPage() {
 	const { config } = useConfig();
+	const { t } = useI18n();
 	const enabled = !!config?.turnstile_enabled;
 	const siteKey = config?.turnstile_site_key || '';
 	const turnstileActive = enabled && !!siteKey;
@@ -25,7 +27,7 @@ export function ForgotPage() {
 		e.preventDefault();
 		setError('');
 		setSuccess('');
-		if (turnstileActive && !turnstileToken) return setError('请完成验证码验证');
+		if (turnstileActive && !turnstileToken) return setError(t.completeCaptcha);
 		setLoading(true);
 		try {
 			const res = await fetch('/api/auth/forgot-password', {
@@ -37,9 +39,9 @@ export function ForgotPage() {
 			if (!res.ok) {
 				setTurnstileToken('');
 				setTurnstileResetKey((v) => v + 1);
-				throw new Error(data?.error || '发送失败');
+				throw new Error(data?.error || t.sendFailed);
 			}
-			setSuccess('如果账号存在，重置邮件已发送。');
+			setSuccess(t.resetEmailSent);
 			setEmail('');
 			setTurnstileToken('');
 			setTurnstileResetKey((v) => v + 1);
@@ -56,10 +58,10 @@ export function ForgotPage() {
 				<div className="p-8">
 					<div className="text-center mb-8">
 						<div className="text-4xl mb-3 animate-bounce-gentle">💌</div>
-						<h1 className="font-display text-2xl font-bold bg-gradient-to-r from-[#e879a0] to-[#a855f7] bg-clip-text text-transparent">
-							忘记密码
-						</h1>
-						<p className="text-sm text-muted-foreground mt-1">输入邮箱，我们发送重置链接</p>
+				<h1 className="font-display text-2xl font-bold bg-gradient-to-r from-[#e879a0] to-[#a855f7] bg-clip-text text-transparent">
+					{t.forgotPasswordTitle}
+				</h1>
+				<p className="text-sm text-muted-foreground mt-1">{t.forgotSubtitle}</p>
 					</div>
 
 					<form className="space-y-5" onSubmit={handleSubmit}>
@@ -74,8 +76,8 @@ export function ForgotPage() {
 							</div>
 						) : null}
 
-						<div className="space-y-2">
-							<Label htmlFor="forgot-email">邮箱</Label>
+				<div className="space-y-2">
+					<Label htmlFor="forgot-email">{t.email}</Label>
 							<Input
 								id="forgot-email"
 								type="email"
@@ -89,15 +91,15 @@ export function ForgotPage() {
 
 						<TurnstileWidget enabled={turnstileActive} siteKey={siteKey} onToken={setTurnstileToken} resetKey={turnstileResetKey} />
 
-						<Button className="w-full" type="submit" disabled={loading}>
-							{loading ? '💌 发送中...' : '📨 发送重置链接'}
-						</Button>
+				<Button className="w-full" type="submit" disabled={loading}>
+					{loading ? t.sending : t.sendReset}
+				</Button>
 
-						<div className="text-sm text-center pt-1">
-							<a className="text-muted-foreground hover:text-primary transition-colors hover:underline" href="/login">
-								返回登录
-							</a>
-						</div>
+				<div className="text-sm text-center pt-1">
+					<a className="text-muted-foreground hover:text-primary transition-colors hover:underline" href="/login">
+						{t.backToLogin}
+					</a>
+				</div>
 					</form>
 				</div>
 			</AuthCard>

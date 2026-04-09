@@ -10,10 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { apiFetch, getSecurityHeaders } from '@/lib/api';
 import { getUser, logout, setUser, type User } from '@/lib/auth';
+import { useI18n } from '@/hooks/use-i18n';
 import { validateText } from '@/lib/validators';
 
 export function SettingsPage() {
 	const [user, setUserState] = React.useState<User | null>(() => getUser());
+	const { t } = useI18n();
 	const [loading, setLoading] = React.useState(false);
 	const [error, setError] = React.useState('');
 
@@ -46,10 +48,10 @@ export function SettingsPage() {
 	async function saveProfile() {
 		if (!user) return;
 		setError('');
-		const err = username ? validateText(username, '用户名') : null;
+		const err = username ? validateText(username, t.usernameLabel) : null;
 		if (err) return setError(err);
-		if (username.length > 20) return setError('用户名过长 (最多 20 字符)');
-		if (avatarUrl && avatarUrl.length > 500) return setError('头像 URL 过长 (最多 500 字符)');
+		if (username.length > 20) return setError(t.usernameTooLong);
+		if (avatarUrl && avatarUrl.length > 500) return setError(t.avatarUrlTooLong);
 
 		setLoading(true);
 		try {
@@ -64,7 +66,7 @@ export function SettingsPage() {
 			});
 			setUser(data.user);
 			setUserState(data.user);
-			alert('资料已更新');
+			alert(t.profileSaved);
 		} catch (e: any) {
 			setError(String(e?.message || e));
 		} finally {
@@ -76,7 +78,7 @@ export function SettingsPage() {
 		if (!user) return;
 		setError('');
 		// allow larger avatar images (2MB)
-		if (file.size > 2 * 1024 * 1024) return setError('文件过大 (最大 2MB)');
+		if (file.size > 2 * 1024 * 1024) return setError(t.fileTooLarge);
 
 		const formData = new FormData();
 		formData.append('file', file);
@@ -89,8 +91,8 @@ export function SettingsPage() {
 				headers: getSecurityHeaders('POST', null),
 				body: formData
 			});
-			const data = (await res.json()) as any;
-			if (!res.ok) throw new Error(data?.error || '上传失败');
+		const data = (await res.json()) as any;
+				if (!res.ok) throw new Error(data?.error || t.uploadFailed);
 			setAvatarUrl(data.url);
 		} catch (e: any) {
 			setError(String(e?.message || e));
@@ -102,7 +104,7 @@ export function SettingsPage() {
 	async function requestEmailChange() {
 		if (!user) return;
 		setError('');
-		if (!emailNew) return setError('请输入新邮箱');
+		if (!emailNew) return setError(t.enterNewEmail);
 		setLoading(true);
 		try {
 			await apiFetch('/user/change-email', {
@@ -110,7 +112,7 @@ export function SettingsPage() {
 				headers: getSecurityHeaders('POST'),
 				body: JSON.stringify({ new_email: emailNew, totp_code: emailTotp })
 			});
-			alert('验证邮件已发送至新地址，请前往新邮箱确认。');
+			alert(t.verifyEmailSent);
 			setEmailNew('');
 			setEmailTotp('');
 		} catch (e: any) {
@@ -155,7 +157,7 @@ export function SettingsPage() {
 			setTotpSecret('');
 			setTotpUri('');
 			setTotpCode('');
-			alert('2FA 已启用');
+			alert(t.twoFAActivated);
 		} catch (e: any) {
 			setError(String(e?.message || e));
 		} finally {
@@ -166,7 +168,7 @@ export function SettingsPage() {
 	async function deleteAccount() {
 		if (!user) return;
 		setError('');
-		if (!confirm('确定要删除您的账号吗？此操作无法撤销。')) return;
+		if (!confirm(t.confirmDeleteAccount)) return;
 		setLoading(true);
 		try {
 			await apiFetch('/user/delete', {
@@ -188,40 +190,40 @@ export function SettingsPage() {
 			<div className="space-y-6">
 				<div className="flex items-center justify-between">
 					<div>
-						<h1 className="text-2xl font-semibold tracking-tight">设置</h1>
-						<p className="text-sm text-muted-foreground">对账号资料、邮箱和 2FA 进行管理。</p>
+				<h1 className="text-2xl font-semibold tracking-tight">{t.settingsTitle}</h1>
+					<p className="text-sm text-muted-foreground">{t.settingsSubtitle}</p>
 					</div>
-					<Button
-						variant="outline"
-						onClick={() => {
-							logout();
-							window.location.href = '/';
-						}}
-					>
-						退出登录
-					</Button>
+				<Button
+					variant="outline"
+					onClick={() => {
+						logout();
+						window.location.href = '/';
+					}}
+				>
+					{t.logoutBtn}
+				</Button>
 				</div>
 
 				{error ? <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive">{error}</div> : null}
 
 				<Card>
-					<CardHeader>
-						<CardTitle>个人资料</CardTitle>
-					</CardHeader>
+				<CardHeader>
+					<CardTitle>{t.profileCard}</CardTitle>
+				</CardHeader>
 					<CardContent className="space-y-4">
 						<div className="grid gap-4 sm:grid-cols-2">
-							<div className="space-y-2">
-								<Label htmlFor="profile-username">用户名</Label>
-								<Input id="profile-username" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={20} />
-							</div>
-							<div className="space-y-2">
-								<Label htmlFor="profile-avatar">头像 URL</Label>
+						<div className="space-y-2">
+							<Label htmlFor="profile-username">{t.usernameLabel}</Label>
+							<Input id="profile-username" value={username} onChange={(e) => setUsername(e.target.value)} maxLength={20} />
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="profile-avatar">{t.avatarUrl}</Label>
 								<Input id="profile-avatar" value={avatarUrl || ''} onChange={(e) => setAvatarUrl(e.target.value)} />
 							</div>
 						</div>
 
-						<div className="space-y-2">
-							<Label htmlFor="avatar-file">上传头像 (最大 500KB)</Label>
+					<div className="space-y-2">
+						<Label htmlFor="avatar-file">{t.uploadAvatar}</Label>
 							<Input
 								id="avatar-file"
 								type="file"
@@ -234,34 +236,34 @@ export function SettingsPage() {
 							/>
 						</div>
 
-						<label className="flex items-center gap-2 text-sm">
-							<input
-								type="checkbox"
-								className="h-4 w-4"
-								checked={emailNotifications}
-								onChange={(e) => setEmailNotifications(e.target.checked)}
-							/>
-							接收邮件通知 (仅限评论)
-						</label>
+					<label className="flex items-center gap-2 text-sm">
+						<input
+							type="checkbox"
+							className="h-4 w-4"
+							checked={emailNotifications}
+							onChange={(e) => setEmailNotifications(e.target.checked)}
+						/>
+						{t.emailNotifications}
+					</label>
 
-						<Button onClick={saveProfile} disabled={loading}>
-							{loading ? '保存中...' : '保存资料'}
-						</Button>
+					<Button onClick={saveProfile} disabled={loading}>
+						{loading ? t.saving : t.saveProfile}
+					</Button>
 					</CardContent>
 				</Card>
 
 				<Card>
-					<CardHeader>
-						<CardTitle>修改邮箱</CardTitle>
-					</CardHeader>
+				<CardHeader>
+					<CardTitle>{t.changeEmail}</CardTitle>
+				</CardHeader>
 					<CardContent className="space-y-4">
 						<div className="grid gap-4 sm:grid-cols-2">
-							<div className="space-y-2">
-								<Label htmlFor="email-new">新邮箱地址</Label>
+						<div className="space-y-2">
+							<Label htmlFor="email-new">{t.newEmail}</Label>
 								<Input id="email-new" type="email" value={emailNew} onChange={(e) => setEmailNew(e.target.value)} />
 							</div>
-							<div className="space-y-2">
-								<Label htmlFor="email-totp">双重验证码 (若开启)</Label>
+						<div className="space-y-2">
+							<Label htmlFor="email-totp">{t.twoFACode} {t.twoFAOptional}</Label>
 								<Input
 									id="email-totp"
 									type="text"
@@ -273,62 +275,62 @@ export function SettingsPage() {
 								/>
 							</div>
 						</div>
-						<Button onClick={requestEmailChange} disabled={loading}>
-							{loading ? '处理中...' : '发送确认邮件'}
-						</Button>
-						<div className="text-sm text-muted-foreground">确认链接将发送到新邮箱。</div>
+					<Button onClick={requestEmailChange} disabled={loading}>
+						{loading ? t.processing : t.sendConfirmEmail}
+					</Button>
+					<div className="text-sm text-muted-foreground">{t.confirmEmailHint}</div>
 					</CardContent>
 				</Card>
 
 				<Card>
-					<CardHeader>
-						<CardTitle>双重验证 (2FA)</CardTitle>
-					</CardHeader>
+				<CardHeader>
+					<CardTitle>{t.twoFA}</CardTitle>
+				</CardHeader>
 					<CardContent className="space-y-4">
-						{user?.totp_enabled ? (
-							<div className="rounded-md border bg-muted/30 p-3 text-sm">✅ 2FA 已启用</div>
-						) : (
-							<>
-								<div className="text-sm text-muted-foreground">启用 2FA 以保护您的账户。</div>
-								<Button onClick={startTotpSetup} disabled={loading || !!totpSecret}>
-									{loading ? '处理中...' : '开始启用'}
-								</Button>
-								{totpSecret ? (
-									<div className="space-y-3 rounded-md border p-4">
-										<div className="text-sm font-medium">1. 扫描二维码</div>
-										<canvas ref={qrCanvasRef} />
-										<div className="text-sm text-muted-foreground">或手动输入密钥：{totpSecret}</div>
-										<Separator />
-										<div className="text-sm font-medium">2. 输入验证码</div>
-										<div className="flex flex-wrap items-center gap-2">
-											<Input
-												value={totpCode}
-												onChange={(e) => setTotpCode(e.target.value)}
-												placeholder="000000"
-												maxLength={6}
-												autoComplete="one-time-code"
-												className="w-32"
-											/>
-											<Button onClick={verifyTotp} disabled={loading}>
-												{loading ? '验证中...' : '验证并启用'}
-											</Button>
-										</div>
+					{user?.totp_enabled ? (
+						<div className="rounded-md border bg-muted/30 p-3 text-sm">{t.twoFAEnabled}</div>
+					) : (
+						<>
+							<div className="text-sm text-muted-foreground">{t.twoFAHint}</div>
+							<Button onClick={startTotpSetup} disabled={loading || !!totpSecret}>
+								{loading ? t.processing : t.startSetup}
+							</Button>
+							{totpSecret ? (
+								<div className="space-y-3 rounded-md border p-4">
+									<div className="text-sm font-medium">{t.scanQR}</div>
+									<canvas ref={qrCanvasRef} />
+									<div className="text-sm text-muted-foreground">{t.manualKey}{totpSecret}</div>
+									<Separator />
+									<div className="text-sm font-medium">{t.enterCode}</div>
+									<div className="flex flex-wrap items-center gap-2">
+										<Input
+											value={totpCode}
+											onChange={(e) => setTotpCode(e.target.value)}
+											placeholder="000000"
+											maxLength={6}
+											autoComplete="one-time-code"
+											className="w-32"
+										/>
+										<Button onClick={verifyTotp} disabled={loading}>
+											{loading ? t.verifying : t.verifyEnable}
+										</Button>
 									</div>
-								) : null}
+								</div>
+							) : null}
 							</>
 						)}
 					</CardContent>
 				</Card>
 
 				<Card className="border-destructive/40">
-					<CardHeader>
-						<CardTitle className="text-destructive">危险区域</CardTitle>
-					</CardHeader>
-					<CardContent className="space-y-4">
-						<div className="text-sm text-muted-foreground">删除账号后无法恢复。</div>
+				<CardHeader>
+					<CardTitle className="text-destructive">{t.dangerZone}</CardTitle>
+				</CardHeader>
+				<CardContent className="space-y-4">
+					<div className="text-sm text-muted-foreground">{t.deleteAccountHint}</div>
 						<div className="grid gap-4 sm:grid-cols-2">
-							<div className="space-y-2">
-								<Label htmlFor="delete-password">密码</Label>
+						<div className="space-y-2">
+							<Label htmlFor="delete-password">{t.password}</Label>
 								<Input
 									id="delete-password"
 									type="password"
@@ -337,8 +339,8 @@ export function SettingsPage() {
 									onChange={(e) => setDeletePassword(e.target.value)}
 								/>
 							</div>
-							<div className="space-y-2">
-								<Label htmlFor="delete-totp">双重验证码 (若开启)</Label>
+						<div className="space-y-2">
+							<Label htmlFor="delete-totp">{t.twoFACode} {t.twoFAOptional}</Label>
 								<Input
 									id="delete-totp"
 									type="text"
@@ -350,9 +352,9 @@ export function SettingsPage() {
 								/>
 							</div>
 						</div>
-						<Button variant="destructive" onClick={deleteAccount} disabled={loading}>
-							{loading ? '处理中...' : '删除账号'}
-						</Button>
+					<Button variant="destructive" onClick={deleteAccount} disabled={loading}>
+						{loading ? t.processing : t.deleteAccount}
+					</Button>
 					</CardContent>
 				</Card>
 			</div>

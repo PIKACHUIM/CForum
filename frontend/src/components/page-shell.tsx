@@ -3,10 +3,12 @@ import * as React from 'react';
 import { SiteHeader } from '@/components/site-header';
 import { getUser, type User } from '@/lib/auth';
 import { useConfig } from '@/hooks/use-config';
+import { useI18n } from '@/hooks/use-i18n';
 
 // 公告横幅组件
 function AnnouncementBanner({ html }: { html: string }) {
 	const [visible, setVisible] = React.useState(true);
+	const { t } = useI18n();
 	if (!html || !visible) return null;
 	return (
 		<div className="mx-auto max-w-5xl px-4 mt-3">
@@ -22,7 +24,7 @@ function AnnouncementBanner({ html }: { html: string }) {
 					type="button"
 					onClick={() => setVisible(false)}
 					className="shrink-0 h-6 w-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-sakura/20 transition-all text-xs"
-					aria-label="关闭公告"
+					aria-label={t.closeAnnouncement}
 				>
 					✕
 				</button>
@@ -40,6 +42,7 @@ export function PageShell({
 }) {
 	const [user, setUser] = React.useState<User | null>(() => getUser());
 	const { config } = useConfig();
+	const { t } = useI18n();
 	const [generatedSecret, setGeneratedSecret] = React.useState<string>('');
 
 	// if jwt not configured, generate a base64-secret for display
@@ -132,8 +135,8 @@ export function PageShell({
 			{config && config.jwt_secret_configured === false && (
 				<div className="mx-auto max-w-5xl px-4 mt-3">
 					<div className="glass rounded-2xl border border-yellow-400/40 bg-yellow-50/70 dark:bg-yellow-900/20 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-200 backdrop-blur-md shadow-anime">
-						⚠️ JWT secret 未配置！请在 Cloudflare Worker secrets 中设置至少 32 字符的 <strong>JWT_SECRET</strong>。
-						建议值：<code className="ml-2 break-all text-xs bg-yellow-100 dark:bg-yellow-900/40 px-1 rounded">{generatedSecret}</code>
+						⚠️ {t.jwtWarning} <strong>JWT_SECRET</strong>。
+						{t.jwtSuggested}<code className="ml-2 break-all text-xs bg-yellow-100 dark:bg-yellow-900/40 px-1 rounded">{generatedSecret}</code>
 					</div>
 				</div>
 			)}
