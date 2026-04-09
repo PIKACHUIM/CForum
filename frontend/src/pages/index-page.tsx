@@ -781,18 +781,68 @@ export function IndexPage() {
 				<div className="space-y-4">
 					<div ref={listTopRef} />
 					{loading ? (
-						<Card>
-							<CardContent className="py-10 text-center">
-								<div className="flex flex-col items-center gap-3">
-									<div className="flex items-center gap-2 text-2xl">
-										<span className="animate-twinkle" style={{animationDelay:'0s'}}>✨</span>
-										<span className="animate-heartbeat" style={{animationDelay:'0.2s'}}>💖</span>
-										<span className="animate-twinkle" style={{animationDelay:'0.4s'}}>✨</span>
+						viewMode === 'list' ? (
+							// 列表视图骨架屏
+							<div className="space-y-3">
+								{Array.from({ length: 4 }).map((_, i) => (
+									<div key={i} className="rounded-2xl border bg-card shadow-card overflow-hidden animate-pulse">
+										<div className="p-4">
+											<div className="flex gap-4">
+												{/* 封面图占位 */}
+												<div className="h-20 w-28 shrink-0 rounded-md bg-gradient-to-br from-sakura/20 to-lavender/20" />
+												<div className="flex-1 space-y-2.5 min-w-0">
+													{/* 标题行 */}
+													<div className="flex items-center gap-2">
+														<div className="h-5 rounded-full bg-gradient-to-r from-sakura/25 to-lavender/20" style={{ width: `${55 + (i * 13) % 30}%` }} />
+													</div>
+													{/* 作者行 */}
+													<div className="flex items-center gap-2">
+														<div className="h-6 w-6 rounded-full bg-sakura/25 shrink-0" />
+														<div className="h-3.5 w-20 rounded-full bg-muted/60" />
+														<div className="h-3.5 w-1 rounded-full bg-muted/40" />
+														<div className="h-3.5 w-16 rounded-full bg-muted/50" />
+													</div>
+													{/* 摘要行 */}
+													<div className="space-y-1.5">
+														<div className="h-3.5 rounded-full bg-muted/50" style={{ width: '92%' }} />
+														<div className="h-3.5 rounded-full bg-muted/40" style={{ width: `${60 + (i * 11) % 25}%` }} />
+													</div>
+													{/* 统计行 */}
+													<div className="flex items-center gap-4">
+														<div className="h-3 w-10 rounded-full bg-muted/40" />
+														<div className="h-3 w-10 rounded-full bg-muted/40" />
+														<div className="h-3 w-10 rounded-full bg-muted/40" />
+													</div>
+												</div>
+											</div>
+										</div>
 									</div>
-									<p className="text-sm text-muted-foreground font-display animate-pulse">{t.loading}</p>
-								</div>
-							</CardContent>
-						</Card>
+								))}
+							</div>
+						) : (
+							// 瀑布流视图骨架屏
+							<div className="columns-1 sm:columns-2 gap-4">
+								{Array.from({ length: 6 }).map((_, i) => (
+									<div key={i} className="break-inside-avoid mb-4 rounded-2xl border bg-card shadow-card overflow-hidden animate-pulse">
+										{/* 封面图占位（高度随机） */}
+										{i % 3 !== 2 ? (
+											<div className="w-full bg-gradient-to-br from-sakura/20 to-lavender/20" style={{ height: `${100 + (i * 37) % 80}px` }} />
+										) : null}
+										<div className="p-4 space-y-2.5">
+											<div className="h-4 rounded-full bg-gradient-to-r from-sakura/25 to-lavender/20" style={{ width: `${60 + (i * 17) % 30}%` }} />
+											<div className="space-y-1.5">
+												<div className="h-3 rounded-full bg-muted/50" style={{ width: '90%' }} />
+												<div className="h-3 rounded-full bg-muted/40" style={{ width: `${50 + (i * 13) % 35}%` }} />
+											</div>
+											<div className="flex items-center gap-2">
+												<div className="h-5 w-5 rounded-full bg-sakura/25 shrink-0" />
+												<div className="h-3 w-16 rounded-full bg-muted/50" />
+											</div>
+										</div>
+									</div>
+								))}
+							</div>
+						)
 					) : posts.length === 0 ? (
 						<Card>
 							<CardContent className="py-10 text-center">
