@@ -35,27 +35,27 @@ jobs:
             process.stdin.on("data", c => input += c);
             process.stdin.on("end", () => {
               const list = JSON.parse(input);
-              const db = Array.isArray(list) ? list.find(item => item.name === "cforum-db") : null;
+              const db = Array.isArray(list) ? list.find(item => item.name === "cfwforum-data") : null;
               process.stdout.write(db?.uuid ?? "");
             });
           ')
 
           if [ -z "$DB_ID" ]; then
-            echo "🆕 D1 database cforum-db not found in this account, creating..."
-            npx wrangler d1 create cforum-db
+            echo "🆕 D1 database cfwforum-data not found in this account, creating..."
+            npx wrangler d1 create cfwforum-data
             DB_ID=$(npx wrangler d1 list --json | node -e '
               let input = "";
               process.stdin.on("data", c => input += c);
               process.stdin.on("end", () => {
                 const list = JSON.parse(input);
-                const db = Array.isArray(list) ? list.find(item => item.name === "cforum-db") : null;
+                const db = Array.isArray(list) ? list.find(item => item.name === "cfwforum-data") : null;
                 process.stdout.write(db?.uuid ?? "");
               });
             ')
           fi
 
           if [ -z "$DB_ID" ]; then
-            echo "❌ Failed to resolve D1 database id for cforum-db"
+            echo "❌ Failed to resolve D1 database id for cfwforum-data"
             exit 1
           fi
 
