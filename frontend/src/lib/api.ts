@@ -40,6 +40,7 @@ export type Post = {
 	author_id: number;
 	title: string;
 	content: string;
+	status?: string;
 	category_id: number | null;
 	category_name?: string | null;
 	is_pinned?: number;

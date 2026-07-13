@@ -10,8 +10,6 @@ export type User = {
 	age?: number | null;
 	gender?: string | null;
 	birthday?: string | null;
-	attribute?: string | null;
-	is_nanliang?: boolean;
 	bio?: string | null;
 	bg_image?: string | null;
 };

@@ -273,6 +273,24 @@ export function PostPage() {
 		}
 	}
 
+	async function toggleHide() {
+		if (!post) return;
+		if (!user || user.id !== post.author_id) return;
+		const isHidden = (post as any).status === 'hidden';
+		const action = isHidden ? 'restore' : 'hide';
+		try {
+			await apiFetch(`/posts/${post.id}/action`, {
+				method: 'POST',
+				headers: getSecurityHeaders('POST'),
+				body: JSON.stringify({ action })
+			});
+			setAdminMenuOpen(false);
+			await refresh();
+		} catch (e: any) {
+			alert(String(e?.message || e));
+		}
+	}
+
 	async function adminMovePostCategory(categoryId: number | null) {
 		if (!post) return;
 		if (!user || user.role !== 'admin') return;
@@ -361,9 +379,13 @@ export function PostPage() {
 							}
 						</div>
 					)}
-					{(post as any).status === 'hidden' && user?.role === 'admin' && (
+				{(post as any).status === 'hidden' && (user?.role === 'admin' || (user && user.id === (post as any).author_id)) && (
 						<div className="rounded-xl border border-amber-400/40 bg-amber-50/80 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2">
-							<span>👁️</span> {t.postHiddenAdmin}
+							<span>👁️</span>
+							{user && user.id === (post as any).author_id && user.role !== 'admin'
+								? t.postHiddenOwner
+								: t.postHiddenAdmin
+							}
 						</div>
 					)}
 						<Card>
@@ -437,7 +459,7 @@ export function PostPage() {
 											</Button>
 											{adminMenuOpen ? (
 												<div className="absolute right-0 top-full z-50 mt-2 w-44 rounded-md border bg-background p-1 shadow-md">
-											{user.role === 'admin' ? (
+									{user.role === 'admin' ? (
 												<button
 													type="button"
 													className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
@@ -445,6 +467,16 @@ export function PostPage() {
 												>
 													<Pin className="h-4 w-4" />
 													{post.is_pinned ? t.unpinPost : t.togglePin}
+												</button>
+											) : null}
+											{user.id === post.author_id ? (
+												<button
+													type="button"
+													className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
+													onClick={() => { setAdminMenuOpen(false); void toggleHide(); }}
+												>
+													<EyeOff className="h-4 w-4" />
+													{(post as any).status === 'hidden' ? t.showPost : t.hidePost}
 												</button>
 											) : null}
 											<button

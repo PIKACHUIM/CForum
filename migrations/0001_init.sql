@@ -35,8 +35,6 @@ CREATE TABLE users (
   age INTEGER,
   gender TEXT,
   birthday TEXT,
-  attribute TEXT,
-  is_nanliang INTEGER DEFAULT 0,
   bio TEXT,
   bg_image TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

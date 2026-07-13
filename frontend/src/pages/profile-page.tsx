@@ -16,8 +16,6 @@ type PublicUser = {
 	age?: number | null;
 	gender?: string | null;
 	birthday?: string | null;
-	attribute?: string | null;
-	is_nanliang?: boolean;
 	bio?: string | null;
 	bg_image?: string | null;
 	created_at?: string | null;
@@ -43,11 +41,6 @@ const GENDER_MAP: Record<string, string> = {
 	male: '男',
 	female: '女',
 	other: '其他',
-};
-
-const ATTRIBUTE_MAP: Record<string, string> = {
-	s: 'S',
-	m: 'M',
 };
 
 function getUserIdFromPath(): string | null {
@@ -172,16 +165,6 @@ export function ProfilePage() {
 						<div className="space-y-2">
 							<div className="flex flex-wrap items-center gap-2">
 								<h1 className="text-xl font-bold font-display">{profile?.username}</h1>
-								{profile?.is_nanliang && (
-									<span className="text-xs bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-300 px-2 py-0.5 rounded-full border border-pink-200 dark:border-pink-700">
-										🌸 南梁
-									</span>
-								)}
-								{profile?.attribute && (
-									<span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-700">
-										{ATTRIBUTE_MAP[profile.attribute] || profile.attribute}
-									</span>
-								)}
 							</div>
 
 							{/* 基本信息标签行 */}

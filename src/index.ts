@@ -783,7 +783,7 @@ env.cfwforum_db.prepare("SELECT COUNT(*) as count FROM users WHERE id != 0").fir
 			try {
 				const userPayload = await authenticate(request);
 				const body = await request.json() as any;
-				const { avatar_url, email_notifications, age, gender, birthday, attribute, is_nanliang, bio, bg_image } = body;
+const { avatar_url, email_notifications, age, gender, birthday, bio, bg_image } = body;
 				// 用户名不允许用户自行修改，忽略传入的 username 字段
 
 				const user_id = userPayload.id;
@@ -815,8 +815,6 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 				const newAge = age !== undefined ? (age === null || age === '' ? null : parseInt(age)) : currentUser.age;
 				const newGender = gender !== undefined ? (gender || null) : currentUser.gender;
 				const newBirthday = birthday !== undefined ? (birthday || null) : currentUser.birthday;
-				const newAttribute = attribute !== undefined ? (attribute || null) : currentUser.attribute;
-				const newIsNanliang = is_nanliang !== undefined ? (is_nanliang ? 1 : 0) : (currentUser.is_nanliang || 0);
 				const newBio = bio !== undefined ? (bio || null) : currentUser.bio;
 
 				// 处理背景图
@@ -831,9 +829,9 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 					}
 				}
 
-				await env.cfwforum_db.prepare(
-					'UPDATE users SET username = ?, avatar_url = ?, email_notifications = ?, age = ?, gender = ?, birthday = ?, attribute = ?, is_nanliang = ?, bio = ?, bg_image = ? WHERE id = ?'
-				).bind(newUsername, newAvatarUrl, newEmailNotif, newAge, newGender, newBirthday, newAttribute, newIsNanliang, newBio, newBgImage, user_id).run();
+			await env.cfwforum_db.prepare(
+					'UPDATE users SET username = ?, avatar_url = ?, email_notifications = ?, age = ?, gender = ?, birthday = ?, bio = ?, bg_image = ? WHERE id = ?'
+				).bind(newUsername, newAvatarUrl, newEmailNotif, newAge, newGender, newBirthday, newBio, newBgImage, user_id).run();
 
 			const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE id = ?').bind(user_id).first<DBUser>();
 			if (!user) return jsonResponse({ error: 'User not found' }, 404);
@@ -844,14 +842,12 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 						email: user.email,
 						username: user.username,
 						avatar_url: user.avatar_url,
-						role: user.role || 'user',
+				role: user.role || 'user',
 						totp_enabled: !!user.totp_enabled,
 						email_notifications: user.email_notifications === 1,
 						age: user.age ?? null,
 						gender: user.gender ?? null,
 						birthday: user.birthday ?? null,
-						attribute: user.attribute ?? null,
-						is_nanliang: !!user.is_nanliang,
 						bio: user.bio ?? null,
 						bg_image: user.bg_image ?? null
 					}
@@ -908,10 +904,8 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 						role: user.role || 'user',
 						age: user.age ?? null,
 						gender: user.gender ?? null,
-						birthday: user.birthday ?? null,
-						attribute: user.attribute ?? null,
-						is_nanliang: !!user.is_nanliang,
-						bio: user.bio ?? null,
+					birthday: user.birthday ?? null,
+					bio: user.bio ?? null,
 						bg_image: user.bg_image ?? null,
 						created_at: (user as any).created_at ?? null
 					},
@@ -1886,7 +1880,34 @@ env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM users WHERE id != 0').fir
 					await env.cfwforum_db.prepare('UPDATE posts SET status = ? WHERE id = ?').bind(statusMap[action], id).run();
 				}
 
-				await security.logAudit(userPayload.id, `ADMIN_POST_${action.toUpperCase()}`, 'post', id, {}, request);
+			await security.logAudit(userPayload.id, `ADMIN_POST_${action.toUpperCase()}`, 'post', id, {}, request);
+				return jsonResponse({ success: true });
+			} catch (e) {
+				return handleError(e);
+			}
+		}
+
+		// POST /api/posts/:id/action (作者隐藏/恢复自己的帖子: hide/restore)
+		if (url.pathname.match(/^\/api\/posts\/\d+\/action$/) && method === 'POST') {
+			const id = url.pathname.split('/')[3];
+			try {
+				const userPayload = await authenticate(request);
+				const body = await request.json() as any;
+				const { action } = body;
+
+				if (!['hide', 'restore'].includes(action)) {
+					return jsonResponse({ error: 'Invalid action' }, 400);
+				}
+
+				// 检查帖子是否存在且属于当前用户
+				const post = await env.cfwforum_db.prepare('SELECT id, author_id FROM posts WHERE id = ?').bind(id).first<{ id: number; author_id: number }>();
+				if (!post) return jsonResponse({ error: 'Post not found' }, 404);
+				if (post.author_id !== userPayload.id) return jsonResponse({ error: 'Unauthorized' }, 403);
+
+				const statusMap: Record<string, string> = { hide: 'hidden', restore: 'normal' };
+				await env.cfwforum_db.prepare('UPDATE posts SET status = ? WHERE id = ?').bind(statusMap[action], id).run();
+
+				await security.logAudit(userPayload.id, `USER_POST_${action.toUpperCase()}`, 'post', id, {}, request);
 				return jsonResponse({ success: true });
 			} catch (e) {
 				return handleError(e);
@@ -2345,8 +2366,8 @@ env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM users WHERE id != 0').fir
                 const countParams: any[] = [];
                 const conditions: string[] = [];
 
-				// 默认只显示正常状态的帖子（非管理员不能看到hidden帖子）
-				conditions.push(`(posts.status = 'normal' OR posts.status = 'locked')`);
+			// 默认只显示正常状态的帖子（隐藏和锁定帖子不显示在公开列表）
+				conditions.push(`(posts.status = 'normal')`);
 
                 if (categoryId) {
                     if (categoryId === 'uncategorized') {
@@ -2417,11 +2438,23 @@ env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM users WHERE id != 0').fir
 
 				if (!post) return jsonResponse({ error: 'Post not found' }, 404);
 
-				// 如果帖子已隐藏，只有管理员可以访问
+		// 如果帖子已隐藏，只有作者和管理员可以访问
 				if ((post as any).status === 'hidden') {
 					try {
 						const userPayload = await authenticate(request);
-						if (userPayload.role !== 'admin') {
+						if (userPayload.role !== 'admin' && userPayload.id !== (post as any).author_id) {
+							return jsonResponse({ error: 'Post not found' }, 404);
+						}
+					} catch {
+						return jsonResponse({ error: 'Post not found' }, 404);
+					}
+				}
+
+				// 如果帖子已锁定，只有作者和管理员可以访问
+				if ((post as any).status === 'locked') {
+					try {
+						const userPayload = await authenticate(request);
+						if (userPayload.role !== 'admin' && userPayload.id !== (post as any).author_id) {
 							return jsonResponse({ error: 'Post not found' }, 404);
 						}
 					} catch {

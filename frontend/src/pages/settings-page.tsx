@@ -25,8 +25,6 @@ export function SettingsPage() {
 	const [age, setAge] = React.useState<string>(user?.age != null ? String(user.age) : '');
 	const [gender, setGender] = React.useState<string>(user?.gender || '');
 	const [birthday, setBirthday] = React.useState<string>(user?.birthday || '');
-	const [attribute, setAttribute] = React.useState<string>(user?.attribute || '');
-	const [isNanliang, setIsNanliang] = React.useState<boolean>(user?.is_nanliang || false);
 	const [bio, setBio] = React.useState<string>(user?.bio || '');
 	const [bgImage, setBgImage] = React.useState<string>(user?.bg_image || '');
 
@@ -76,8 +74,6 @@ export function SettingsPage() {
 					age: age ? parseInt(age) : null,
 					gender: gender || null,
 					birthday: birthday || null,
-					attribute: attribute || null,
-					is_nanliang: isNanliang,
 					bio: bio || null,
 					bg_image: bgImage || null
 				})
@@ -355,33 +351,6 @@ export function SettingsPage() {
 							value={birthday}
 							onChange={(e) => setBirthday(e.target.value)}
 						/>
-					</div>
-				</div>
-
-				<div className="grid gap-4 sm:grid-cols-2">
-					<div className="space-y-2">
-						<Label htmlFor="profile-attribute">属性</Label>
-						<select
-							id="profile-attribute"
-							className="flex h-10 w-full rounded-xl border-2 border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-							value={attribute}
-							onChange={(e) => setAttribute(e.target.value)}
-						>
-							<option value="">不填写</option>
-							<option value="s">S</option>
-							<option value="m">M</option>
-						</select>
-					</div>
-					<div className="space-y-2 flex flex-col justify-end">
-						<label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-							<input
-								type="checkbox"
-								className="h-4 w-4 accent-pink-500"
-								checked={isNanliang}
-								onChange={(e) => setIsNanliang(e.target.checked)}
-							/>
-							<span className="font-medium">是否南梁 🌸</span>
-						</label>
 					</div>
 				</div>
 
