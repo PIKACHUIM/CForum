@@ -81,9 +81,13 @@ export function getSecurityHeaders(method: string, contentType: string | null = 
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 	const res = await fetch(`${API_BASE}${path}`, init);
-	if (res.status === 401) {
+	if (res.status === 401 || res.status === 403) {
 		logout();
-		throw new Error('登录已过期，请重新登录');
+		// 延迟跳转，确保 localStorage 被清除
+		setTimeout(() => {
+			window.location.href = '/login';
+		}, 100);
+		throw new Error(res.status === 403 ? '账号已被封禁或删除，如有疑问请联系管理员' : '登录已过期，请重新登录');
 	}
 	const text = await res.text();
 	const data = text ? (JSON.parse(text) as any) : null;

@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { useConfig } from '@/hooks/use-config';
 import { useI18n } from '@/hooks/use-i18n';
 import { getSecurityHeaders } from '@/lib/api';
-import { setToken, setUser } from '@/lib/auth';
 
 // 默认用户协议
 const DEFAULT_TERMS = `用户协议
@@ -149,18 +148,10 @@ export function RegisterPage() {
 				throw new Error(data?.error || t.registerFailed);
 			}
 			setSuccess(t.registerSuccess);
-			// 注册成功后自动登录
-			if (data.token && data.user) {
-				setToken(data.token);
-				setUser(data.user);
-				window.location.href = '/';
-				return;
-			}
-			setEmail('');
-			setUsername('');
-			setPassword('');
-			setTurnstileToken('');
-			setTurnstileResetKey((v) => v + 1);
+			// 注册成功后跳转登录页
+			setTimeout(() => {
+				window.location.href = '/login';
+			}, 1500);
 		} catch (err: any) {
 			setError(String(err?.message || err));
 		} finally {

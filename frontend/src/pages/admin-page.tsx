@@ -445,6 +445,10 @@ function UsersTab({ currentUserId }: { currentUserId?: number }) {
 	// 确认弹窗
 	const [confirmOpen, setConfirmOpen] = React.useState(false);
 	const [confirmConfig, setConfirmConfig] = React.useState<{ title: string; desc: string; onOk: () => void } | null>(null);
+	// 删除用户弹窗
+	const [deleteUserOpen, setDeleteUserOpen] = React.useState(false);
+	const [deleteUserId, setDeleteUserId] = React.useState<number | null>(null);
+	const [deleteMode, setDeleteMode] = React.useState<'keep_content' | 'delete_all'>('delete_all');
 
 	const load = React.useCallback(async (off = 0) => {
 		setLoading(true);
@@ -482,19 +486,24 @@ function UsersTab({ currentUserId }: { currentUserId?: number }) {
 	}
 
 	function deleteUser(id: number) {
-		setConfirmConfig({
-			title: '删除用户',
-			desc: '确定删除该用户？此操作不可撤销。',
-			onOk: async () => {
-				try {
-					await apiFetch(`/admin/users/${id}`, { method: 'DELETE', headers: getSecurityHeaders('DELETE') });
-					toast('success', '用户已删除');
-					load(offset);
-				} catch (e: any) { toast('error', e?.message || '操作失败'); }
-			}
-		});
-		setConfirmOpen(true);
+		setDeleteUserId(id);
+		setDeleteMode('delete_all');
+		setDeleteUserOpen(true);
 	}
+
+	const executeDelete = React.useCallback(async () => {
+		if (!deleteUserId) return;
+		try {
+			await apiFetch(`/admin/users/${deleteUserId}`, {
+				method: 'DELETE',
+				headers: getSecurityHeaders('DELETE'),
+				body: JSON.stringify({ mode: deleteMode })
+			});
+			toast('success', '用户已删除');
+			setDeleteUserOpen(false);
+			load(offset);
+		} catch (e: any) { toast('error', e?.message || '操作失败'); }
+	}, [deleteUserId, deleteMode, offset]);
 
 	function manualVerify(id: number) {
 		setConfirmConfig({
@@ -670,6 +679,38 @@ function UsersTab({ currentUserId }: { currentUserId?: number }) {
 					<DialogFooter>
 						<Button variant="outline" onClick={() => setEditOpen(false)}>取消</Button>
 						<Button onClick={saveEdit} disabled={editLoading}>{editLoading ? '保存中…' : '保存'}</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+			{/* 删除用户弹窗（含保留内容选项） */}
+			<Dialog open={deleteUserOpen} onOpenChange={setDeleteUserOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle className="flex items-center gap-2">
+							<AlertTriangle className="h-5 w-5 text-red-500" />
+							删除用户
+						</DialogTitle>
+						<DialogDescription>此操作不可撤销，请选择删除方式：</DialogDescription>
+					</DialogHeader>
+					<div className="grid gap-3 py-4">
+						<label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${deleteMode === 'delete_all' ? 'border-red-400 bg-red-50 dark:bg-red-950/20' : 'border-border hover:border-muted-foreground/30'}`}>
+							<input type="radio" name="deleteMode" checked={deleteMode === 'delete_all'} onChange={() => setDeleteMode('delete_all')} className="mt-0.5 accent-red-500" />
+							<div>
+								<div className="font-medium text-sm">彻底删除用户及所有内容</div>
+								<div className="text-xs text-muted-foreground mt-0.5">删除该用户及其所有帖子、评论、点赞</div>
+							</div>
+						</label>
+						<label className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${deleteMode === 'keep_content' ? 'border-sky-400 bg-sky-50 dark:bg-sky-950/20' : 'border-border hover:border-muted-foreground/30'}`}>
+							<input type="radio" name="deleteMode" checked={deleteMode === 'keep_content'} onChange={() => setDeleteMode('keep_content')} className="mt-0.5 accent-sky-500" />
+							<div>
+								<div className="font-medium text-sm">保留帖子内容</div>
+								<div className="text-xs text-muted-foreground mt-0.5">帖子和评论将归属到「已注销」用户，仅删除该用户的点赞和会话</div>
+							</div>
+						</label>
+					</div>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setDeleteUserOpen(false)}>取消</Button>
+						<Button variant="destructive" onClick={executeDelete}>确认删除</Button>
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>

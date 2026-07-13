@@ -2,7 +2,7 @@ import * as React from 'react';
 import createDOMPurify from 'dompurify';
 
 import { SiteHeader } from '@/components/site-header';
-import { getUser, type User } from '@/lib/auth';
+import { getUser, getToken, logout, type User } from '@/lib/auth';
 import { useConfig } from '@/hooks/use-config';
 import { useI18n } from '@/hooks/use-i18n';
 import { Button } from '@/components/ui/button';
@@ -88,7 +88,61 @@ export function PageShell({
 		}
 	}, [config, generatedSecret]);
 
-	// 动态注入站点设置
+	// 页面加载时校验一次 token 有效性（被封禁/删除的用户不应看到登录态）
+	React.useEffect(() => {
+		const token = getToken();
+		if (!token) return; // 未登录，无需校验
+
+		let cancelled = false;
+		(async () => {
+			try {
+				const res = await fetch('/api/auth/check', {
+					headers: { Authorization: `Bearer ${token}` }
+				});
+				if (!res.ok && !cancelled) {
+					logout();
+					setUser(null);
+				}
+			} catch {
+				// 网络错误忽略，不踢下线
+			}
+		})();
+		return () => { cancelled = true; };
+	}, []);
+
+	// 周期心跳检测：确保被封禁/删除的用户被立刻踢下线
+	/*
+	React.useEffect(() => {
+		const token = getToken();
+		if (!token) return; // 未登录，无需检测
+
+		let active = true;
+		const CHECK_INTERVAL = 30_000; // 30秒检测一次
+
+		async function check() {
+			if (!active) return;
+			try {
+				const res = await fetch('/api/auth/check', {
+					headers: { Authorization: `Bearer ${token}` }
+				});
+				if (!res.ok && active) {
+					// 认证失败：被封禁/删除/过期
+					logout();
+					setUser(null);
+					window.location.href = '/login';
+				}
+			} catch {
+				// 网络错误忽略，不踢下线
+			}
+		}
+
+		const timer = setInterval(check, CHECK_INTERVAL);
+		return () => {
+			active = false;
+			clearInterval(timer);
+		};
+	}, []);
+	*/
 	React.useEffect(() => {
 		if (!config) return;
 

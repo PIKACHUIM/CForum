@@ -16,9 +16,7 @@ export class Security {
         this.env = env;
         let secretStr = String(env.JWT_SECRET || '');
         if (!secretStr || secretStr.length < 32) {
-            console.warn('JWT_SECRET missing or too short; generating a temporary key. Configure a proper secret to enable authentication and preserve sessions.');
-            const arr = crypto.getRandomValues(new Uint8Array(48));
-            secretStr = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+            throw new Error('FATAL: JWT_SECRET is missing or too short (min 32 chars). Configure a proper secret via `wrangler secret put JWT_SECRET` to enable authentication.');
         }
         this.secret = new TextEncoder().encode(secretStr);
     }
@@ -54,6 +52,13 @@ export class Security {
             if (!session) return null;
             if (Number(session.user_id) !== id) return null;
             if (Number(session.expires_at) <= Math.floor(Date.now() / 1000)) return null;
+
+            // 封禁用户拦截：即使 session 存在也拒绝访问（防御性检查）
+            const userStatus = await this.env.cfwforum_db
+                .prepare('SELECT status FROM users WHERE id = ?')
+                .bind(id)
+                .first<{ status: string }>();
+            if (userStatus && userStatus.status === 'banned') return null;
 
             if (Math.random() < 0.01) {
                 await this.env.cfwforum_db.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(Math.floor(Date.now() / 1000)).run();

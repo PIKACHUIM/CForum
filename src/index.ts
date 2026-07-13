@@ -12,6 +12,7 @@ interface DBUser {
     password: string;
     verified: number;
     role?: string;
+    status?: string;
     avatar_url?: string;
     totp_secret?: string;
     totp_enabled?: number;
@@ -83,11 +84,12 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 // Verify password against stored hash (supports both PBKDF2 and legacy SHA-256)
-async function verifyPassword(password: string, stored: string): Promise<boolean> {
+// Returns { valid, isLegacy } — isLegacy indicates whether the stored hash is old SHA-256 format
+async function verifyPassword(password: string, stored: string): Promise<{ valid: boolean; isLegacy: boolean }> {
 	// New PBKDF2 format: pbkdf2:<iterations>:<salt_hex>:<hash_hex>
 	if (stored.startsWith('pbkdf2:')) {
 		const parts = stored.split(':');
-		if (parts.length !== 4) return false;
+		if (parts.length !== 4) return { valid: false, isLegacy: false };
 		const iterations = parseInt(parts[1], 10);
 		const saltHex = parts[2];
 		const expectedHash = parts[3];
@@ -106,14 +108,14 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
 			256
 		);
 		const hashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('');
-		return hashHex === expectedHash;
+		return { valid: hashHex === expectedHash, isLegacy: false };
 	}
 
 	// Legacy SHA-256 format (plain hex string, 64 chars)
 	const myText = new TextEncoder().encode(password);
 	const myDigest = await crypto.subtle.digest({ name: 'SHA-256' }, myText);
 	const hashHex = Array.from(new Uint8Array(myDigest)).map(b => b.toString(16).padStart(2, '0')).join('');
-	return hashHex === stored;
+	return { valid: hashHex === stored, isLegacy: true };
 }
 
 function generateToken(): string {
@@ -265,6 +267,7 @@ export default {
   username TEXT NOT NULL,
   password TEXT NOT NULL,
   role TEXT DEFAULT 'user',
+  status TEXT DEFAULT 'normal',
   verified INTEGER DEFAULT 0,
   verification_token TEXT,
   totp_secret TEXT,
@@ -290,6 +293,7 @@ export default {
   content TEXT NOT NULL,
   category_id INTEGER,
   is_pinned INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'normal',
   view_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (author_id) REFERENCES users(id),
@@ -301,6 +305,7 @@ export default {
   parent_id INTEGER,
   author_id INTEGER NOT NULL,
   content TEXT NOT NULL,
+  status TEXT DEFAULT 'normal',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (post_id) REFERENCES posts(id),
   FOREIGN KEY (parent_id) REFERENCES comments(id),
@@ -352,6 +357,21 @@ export default {
 					console.error('Error running schema statement', e, stmt);
 				}
 			}
+
+			// 兼容旧数据库：为可能缺少 status 列的表添加该列
+			const alterStmts = [
+				`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'normal'`,
+				`ALTER TABLE posts ADD COLUMN status TEXT DEFAULT 'normal'`,
+				`ALTER TABLE comments ADD COLUMN status TEXT DEFAULT 'normal'`,
+			];
+			for (const stmt of alterStmts) {
+				try {
+					await env.cfwforum_db.prepare(stmt).run();
+				} catch (_) {
+					// 列已存在时忽略错误
+				}
+			}
+
 			// verify posts table exists now
 			try {
 				await env.cfwforum_db.prepare('SELECT 1 FROM posts LIMIT 1').first();
@@ -385,9 +405,12 @@ export default {
 			if (!payload) {
 				throw new Error('Unauthorized');
 			}
-			// 检查用户是否被封禁
+			// 检查用户是否存在以及是否被封禁
 			const userStatus = await env.cfwforum_db.prepare('SELECT status FROM users WHERE id = ?').bind(payload.id).first<{ status: string }>();
-			if (userStatus && userStatus.status === 'banned') {
+			if (!userStatus) {
+				throw new Error('账号不存在或已被删除');
+			}
+			if (userStatus.status === 'banned') {
 				throw new Error('账号已被封禁，如有疑问请联系管理员');
 			}
 			return payload;
@@ -398,6 +421,9 @@ export default {
 			const errString = String(e);
 			if (errString.includes('Unauthorized') || errString.includes('Invalid Token')) {
 				return jsonResponse({ error: 'Unauthorized' }, 401);
+			}
+			if (errString.includes('已被封禁') || errString.includes('账号不存在') || errString.includes('已被删除')) {
+				return jsonResponse({ error: errString }, 403);
 			}
 			return jsonResponse({ error: errString }, 500);
 		};
@@ -448,7 +474,7 @@ export default {
 			try {
 				const [setting, userCount, allSettings] = await Promise.all([
 					env.cfwforum_db.prepare("SELECT value FROM settings WHERE key = 'turnstile_enabled'").first<DBSetting>(),
-					env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM users').first('count'),
+env.cfwforum_db.prepare("SELECT COUNT(*) as count FROM users WHERE id != 0").first('count'),
 					env.cfwforum_db.prepare("SELECT key, value FROM settings").all()
 				]);
 
@@ -686,8 +712,17 @@ export default {
 					return jsonResponse({ error: 'Please verify your email first' }, 403);
 				}
 
-				if (!(await verifyPassword(password, user.password))) {
+			const verifyResult = await verifyPassword(password, user.password);
+				if (!verifyResult.valid) {
 					return jsonResponse({ error: 'Username or Password Error' }, 401);
+				}
+
+				// 自动将旧 SHA-256 密码升级为 PBKDF2
+				if (verifyResult.isLegacy) {
+					const upgradedHash = await hashPassword(password);
+					await env.cfwforum_db.prepare('UPDATE users SET password = ? WHERE id = ?')
+						.bind(upgradedHash, user.id).run();
+					console.log(`[Security] Upgraded legacy SHA-256 password to PBKDF2 for user ${user.id}`);
 				}
 
 				// 检查用户是否被封禁
@@ -919,8 +954,9 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 				const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE id = ?').bind(user_id).first<DBUser>();
 				if (!user) return jsonResponse({ error: 'User not found' }, 404);
 
-				// Verify Password (Double check for sensitive delete op)
-				if (!(await verifyPassword(password, user.password))) {
+			// Verify Password (Double check for sensitive delete op)
+				const verifyResult = await verifyPassword(password, user.password);
+				if (!verifyResult.valid) {
 					return jsonResponse({ error: 'Invalid password' }, 401);
 				}
 
@@ -968,7 +1004,10 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 				await env.cfwforum_db.prepare('DELETE FROM likes WHERE user_id = ?').bind(user_id).run();
 				await env.cfwforum_db.prepare('DELETE FROM comments WHERE author_id = ?').bind(user_id).run();
 
-				// 4. Delete posts and user
+				// 4. Delete sessions (log user out)
+				await env.cfwforum_db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user_id).run();
+
+				// 5. Delete posts and user
 				await env.cfwforum_db.prepare('DELETE FROM posts WHERE author_id = ?').bind(user_id).run();
 				await env.cfwforum_db.prepare('DELETE FROM users WHERE id = ?').bind(user_id).run();
 
@@ -1044,6 +1083,16 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 				} else {
 					return jsonResponse({ error: 'Invalid code' }, 400);
 				}
+			} catch (e) {
+				return handleError(e);
+			}
+		}
+
+		// GET /api/auth/check — 轻量级认证有效性检查（供前端心跳检测用）
+		if (url.pathname === '/api/auth/check' && method === 'GET') {
+			try {
+				const userPayload = await authenticate(request);
+				return jsonResponse({ valid: true, user: { id: userPayload.id, role: userPayload.role } });
 			} catch (e) {
 				return handleError(e);
 			}
@@ -1150,8 +1199,9 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 				const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE id = ?').bind(userPayload.id).first<DBUser>();
 				if (!user) return jsonResponse({ error: 'User not found' }, 404);
 
-			// 验证旧密码
-				if (!(await verifyPassword(old_password, user.password))) return jsonResponse({ error: 'Current password is incorrect' }, 401);
+		// 验证旧密码
+				const verifyResult = await verifyPassword(old_password, user.password);
+				if (!verifyResult.valid) return jsonResponse({ error: 'Current password is incorrect' }, 401);
 
 				// 若开启了 2FA，需要验证
 				if (user.totp_enabled) {
@@ -1470,7 +1520,7 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
 
 				const [userCount, postCount, commentCount] = await Promise.all([
-					env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM users').first<number>('count'),
+env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM users WHERE id != 0').first<number>('count'),
 					env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM posts').first<number>('count'),
 					env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM comments').first<number>('count')
 				]);
@@ -1568,10 +1618,15 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 
 		// DELETE /api/admin/users/:id
 		if (url.pathname.startsWith('/api/admin/users/') && method === 'DELETE') {
-			const id = url.pathname.split('/').pop();
+		const id = url.pathname.split('/').pop();
 			try {
 				const userPayload = await authenticate(request);
 				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
+
+				// 不允许删除幽灵用户（id=0 的"已注销"内部账号）
+				if (id === '0') {
+					return jsonResponse({ error: 'Cannot delete the internal system account' }, 403);
+				}
 
 				// 读取删除模式: delete_all（完全删除）/ keep_content（保留内容指向已注销用户）
 				let mode = 'delete_all';
@@ -1760,10 +1815,11 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 
 				const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
 				const offset = parseInt(url.searchParams.get('offset') || '0');
-				const q = (url.searchParams.get('q') || '').trim();
+			const q = (url.searchParams.get('q') || '').trim();
 				const status = url.searchParams.get('status') || '';
 
-				let conditions: string[] = [];
+				// 排除幽灵用户（id=0 的"已注销"内部账号）
+				let conditions: string[] = ['id != 0'];
 				const params: any[] = [];
 
 				if (q) {
@@ -2031,12 +2087,22 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 					if (key) usedKeys.add(key);
 				}
 
-				// Posts images
+			// Posts images
 				const posts = await env.cfwforum_db.prepare('SELECT content FROM posts').all();
 				for (const p of posts.results) {
 					const urls = extractImageUrls(p.content as string);
 					for (const uUrl of urls) {
 						const key = uUrl ? getKeyFromUrl(env as unknown as S3Env, uUrl) : null;
+						if (key) usedKeys.add(key);
+					}
+				}
+
+				// Site settings images (favicon, logo, background, etc.)
+				const imageSettingKeys = ['site_favicon_url', 'site_logo_url', 'site_bg_image'];
+				for (const settingKey of imageSettingKeys) {
+					const row = await env.cfwforum_db.prepare('SELECT value FROM settings WHERE key = ?').bind(settingKey).first<{value: string}>();
+					if (row && row.value) {
+						const key = getKeyFromUrl(env as unknown as S3Env, row.value);
 						if (key) usedKeys.add(key);
 					}
 				}
@@ -2193,33 +2259,6 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 						await env.cfwforum_db.prepare('UPDATE users SET avatar_url = ? WHERE username = ?').bind(identicon, username).run();
 						avatarUrl = identicon;
 					}
-				}
-
-				// 注册成功后自动登录
-				const newUserId = meta?.last_row_id as number | undefined;
-				if (newUserId) {
-					const { token, jti, expiresAt } = await security.generateToken({
-						id: newUserId,
-						role: 'user',
-						email: email
-					});
-					await env.cfwforum_db.prepare('INSERT INTO sessions (jti, user_id, expires_at) VALUES (?, ?, ?)').bind(jti, newUserId, expiresAt).run();
-
-					return jsonResponse({
-						success,
-						message: '注册成功，请前往邮箱完成验证。',
-						token,
-						user: {
-							id: newUserId,
-							email,
-							username,
-							avatar_url: avatarUrl,
-							role: 'user',
-							totp_enabled: false,
-							email_notifications: true,
-							verified: false
-						}
-					}, 201);
 				}
 
 				return jsonResponse({ success, message: '注册成功，请前往邮箱完成验证。' }, 201);
