@@ -342,7 +342,8 @@ export default {
 );`,
 				`INSERT OR IGNORE INTO settings (key, value) VALUES ('turnstile_enabled', '0');`,
 				`INSERT OR IGNORE INTO users (email, username, password, role, verified, nickname) VALUES
-('admin@adysec.com', 'Admin', 'e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3acc7', 'admin', 1, 'System Admin');`
+('admin@adysec.com', 'Admin', 'e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3acc7', 'admin', 1, 'System Admin');`,
+				`INSERT OR IGNORE INTO users (id, email, username, password, role, verified) VALUES (0, 'deleted@internal', '已注销', '', 'deleted', 1);`
 			];
 			for (const stmt of stmts) {
 				try {
@@ -1572,40 +1573,77 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 				const userPayload = await authenticate(request);
 				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
 
-				// 0. Delete user avatar and post images
-				const user = await env.cfwforum_db.prepare('SELECT avatar_url FROM users WHERE id = ?').bind(id).first<{avatar_url?: string}>();
-				const posts = await env.cfwforum_db.prepare('SELECT content FROM posts WHERE author_id = ?').bind(id).all();
-
-				const deletionPromises: Promise<any>[] = [];
-				if (user && user.avatar_url) {
-					deletionPromises.push(deleteImage(env as unknown as S3Env, user.avatar_url, id));
-				}
-				if (posts.results) {
-					for (const post of posts.results) {
-						const imageUrls = extractImageUrls(post.content as string);
-						imageUrls.forEach(url => deletionPromises.push(deleteImage(env as unknown as S3Env, url, id)));
+				// 读取删除模式: delete_all（完全删除）/ keep_content（保留内容指向已注销用户）
+				let mode = 'delete_all';
+				try {
+					const body = await request.json() as any;
+					if (body && body.mode === 'keep_content') {
+						mode = 'keep_content';
 					}
+				} catch (_) {
+					// 无请求体时默认 delete_all
 				}
-				if (deletionPromises.length > 0) {
-					ctx.waitUntil(Promise.all(deletionPromises).catch(err => console.error('Failed to delete user images', err)));
+
+				const userToDelete = await env.cfwforum_db.prepare('SELECT email, username, avatar_url FROM users WHERE id = ?').bind(id).first<{email: string; username: string; avatar_url?: string}>();
+
+				// 删除用户头像
+				if (userToDelete && userToDelete.avatar_url) {
+					ctx.waitUntil(deleteImage(env as unknown as S3Env, userToDelete.avatar_url, id).catch(err => console.error('Failed to delete avatar', err)));
 				}
 
-				// 1. Delete likes and comments ON the user's posts (to avoid orphans)
-				await env.cfwforum_db.prepare('DELETE FROM likes WHERE post_id IN (SELECT id FROM posts WHERE author_id = ?)').bind(id).run();
-				await env.cfwforum_db.prepare('DELETE FROM comments WHERE post_id IN (SELECT id FROM posts WHERE author_id = ?)').bind(id).run();
+				if (mode === 'keep_content') {
+					// 保留内容模式：将帖子和评论的作者指向"已注销"幽灵用户(uid=0)
+					await env.cfwforum_db.prepare('INSERT OR IGNORE INTO users (id, email, username, password, role, verified) VALUES (0, \'deleted@internal\', \'已注销\', \'\', \'deleted\', 1)').run();
 
-				// 2. Delete the user's own activity (likes and comments they made)
-				await env.cfwforum_db.prepare('DELETE FROM likes WHERE user_id = ?').bind(id).run();
-				await env.cfwforum_db.prepare('DELETE FROM comments WHERE author_id = ?').bind(id).run();
+					// 将帖子和评论的作者指向幽灵用户
+					await env.cfwforum_db.prepare('UPDATE posts SET author_id = 0 WHERE author_id = ?').bind(id).run();
+					await env.cfwforum_db.prepare('UPDATE comments SET author_id = 0 WHERE author_id = ?').bind(id).run();
+					// 删除该用户的点赞（点赞仅对用户有意义，不保留）
+					await env.cfwforum_db.prepare('DELETE FROM likes WHERE user_id = ?').bind(id).run();
+					// 删除该用户在别人帖子下的点赞
+					await env.cfwforum_db.prepare('DELETE FROM likes WHERE post_id IN (SELECT id FROM posts WHERE author_id = ?)').bind(id).run();
 
-				// 3. Delete the user's posts
-				await env.cfwforum_db.prepare('DELETE FROM posts WHERE author_id = ?').bind(id).run();
+					// 删除 sessions
+					await env.cfwforum_db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id).run();
 
-				// 4. Finally, delete the user
-				const userToDelete = await env.cfwforum_db.prepare('SELECT email, username FROM users WHERE id = ?').bind(id).first();
-				await env.cfwforum_db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
+					// 删除用户
+					await env.cfwforum_db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
 
-				await security.logAudit(userPayload.id, 'ADMIN_DELETE_USER', 'user', String(id), {}, request);
+					await security.logAudit(userPayload.id, 'ADMIN_DELETE_USER_KEEP_CONTENT', 'user', String(id), {}, request);
+				} else {
+					// 完全删除模式：删除所有关联数据
+					const posts = await env.cfwforum_db.prepare('SELECT content FROM posts WHERE author_id = ?').bind(id).all();
+
+					const deletionPromises: Promise<any>[] = [];
+					if (posts.results) {
+						for (const post of posts.results) {
+							const imageUrls = extractImageUrls(post.content as string);
+							imageUrls.forEach(url => deletionPromises.push(deleteImage(env as unknown as S3Env, url, id)));
+						}
+					}
+					if (deletionPromises.length > 0) {
+						ctx.waitUntil(Promise.all(deletionPromises).catch(err => console.error('Failed to delete post images', err)));
+					}
+
+					// 1. Delete likes and comments ON the user's posts (to avoid orphans)
+					await env.cfwforum_db.prepare('DELETE FROM likes WHERE post_id IN (SELECT id FROM posts WHERE author_id = ?)').bind(id).run();
+					await env.cfwforum_db.prepare('DELETE FROM comments WHERE post_id IN (SELECT id FROM posts WHERE author_id = ?)').bind(id).run();
+
+					// 2. Delete the user's own activity (likes and comments they made)
+					await env.cfwforum_db.prepare('DELETE FROM likes WHERE user_id = ?').bind(id).run();
+					await env.cfwforum_db.prepare('DELETE FROM comments WHERE author_id = ?').bind(id).run();
+
+					// 3. Delete sessions
+					await env.cfwforum_db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id).run();
+
+					// 4. Delete the user's posts
+					await env.cfwforum_db.prepare('DELETE FROM posts WHERE author_id = ?').bind(id).run();
+
+					// 5. Finally, delete the user
+					await env.cfwforum_db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
+
+					await security.logAudit(userPayload.id, 'ADMIN_DELETE_USER', 'user', String(id), {}, request);
+				}
 
 				// Notification
 				if (userToDelete) {

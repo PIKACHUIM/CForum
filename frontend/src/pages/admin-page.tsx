@@ -1501,7 +1501,7 @@ export function AdminPage() {
 	}
 
 	const navItems: Array<{ id: AdminTab; icon: React.ReactNode; label: string }> = [
-		{ id: 'overview',    icon: <BarChart2 className="h-4 w-4" />,     label: '概览' },
+		{ id: 'overview',    icon: <BarChart2 className="h-4 w-4" />,     label: '系统概览' },
 		{ id: 'posts',       icon: <FileText className="h-4 w-4" />,      label: '帖子管理' },
 		{ id: 'comments',    icon: <MessageSquare className="h-4 w-4" />, label: '评论管理' },
 		{ id: 'users',       icon: <Users className="h-4 w-4" />,         label: '用户管理' },

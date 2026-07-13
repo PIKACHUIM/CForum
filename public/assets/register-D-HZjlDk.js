@@ -1,4 +1,4 @@
-import{u as O,r as t,j as e,B as R,c as H,d as J,s as V,m as W}from"./api-CD_qkhHa.js";import{T as Y}from"./turnstile-gIwnGzrL.js";import{A as G,a as Q}from"./auth-shell-Dpp-nSjx.js";import{I as h}from"./input-DQwUwiMQ.js";import{L as p}from"./label-Behmo_i_.js";import{u as _}from"./use-i18n-BDhmiSAX.js";const X=`用户协议
+import{u as O,r as t,j as e,B as R,c as H,d as J,s as V,m as W}from"./api-gfxnrhVU.js";import{T as Y}from"./turnstile-gnsAnuG1.js";import{A as G,a as Q}from"./auth-shell-wQrNrzzw.js";import{I as h}from"./input-LzSVRO9V.js";import{L as p}from"./label-BY2GVP_4.js";import{u as _}from"./use-i18n-MLtFW5Pj.js";const X=`用户协议
 
 欢迎使用本论坛（以下简称"本站"）。在注册账号前，请仔细阅读以下条款：
 
