@@ -6,6 +6,7 @@ import { getUser, type User } from '@/lib/auth';
 import { useConfig } from '@/hooks/use-config';
 import { useI18n } from '@/hooks/use-i18n';
 import { Button } from '@/components/ui/button';
+import { applyColorTheme, getColorTheme, type ColorTheme } from '@/lib/theme';
 
 // 安全净化 HTML，防止 XSS
 function sanitizeHtml(html: string): string {
@@ -19,15 +20,15 @@ function PolicyModal({ title, content, onClose }: { title: string; content: stri
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
 			<div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-			<div className="relative z-10 w-full max-w-lg max-h-[70vh] flex flex-col rounded-2xl border border-sakura/30 bg-background shadow-2xl">
-				<div className="flex items-center justify-between px-5 py-4 border-b border-sakura/20 bg-gradient-to-r from-sakura/10 to-lavender/10 rounded-t-2xl">
+			<div className="relative z-10 w-full max-w-lg max-h-[70vh] flex flex-col rounded-2xl border border-border bg-background shadow-elevated">
+				<div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/30 rounded-t-2xl">
 					<h3 className="font-display font-bold text-base">{title}</h3>
 					<button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none">✕</button>
 				</div>
 				<div className="overflow-y-auto flex-1 p-5">
 					<pre className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed font-sans">{content}</pre>
 				</div>
-				<div className="px-5 py-3 border-t border-sakura/20">
+				<div className="px-5 py-3 border-t border-border">
 					<Button size="sm" className="w-full" onClick={onClose}>{t.iHaveRead}</Button>
 				</div>
 			</div>
@@ -42,7 +43,7 @@ function AnnouncementBanner({ html }: { html: string }) {
 	if (!html || !visible) return null;
 	return (
 		<div className="mx-auto max-w-5xl px-4 mt-3">
-			<div className="glass rounded-2xl border border-sakura/25 shadow-anime px-4 py-2.5 flex items-center justify-between gap-3 text-sm bg-gradient-to-r from-sakura/10 via-lavender/10 to-sky/10 backdrop-blur-md">
+			<div className="glass rounded-2xl border border-border shadow-card px-4 py-2.5 flex items-center justify-between gap-3 text-sm bg-muted/20">
 				<div className="flex items-center gap-2 flex-1 min-w-0">
 					<span className="text-base shrink-0 animate-bounce-gentle">📢</span>
 				<span
@@ -53,7 +54,7 @@ function AnnouncementBanner({ html }: { html: string }) {
 				<button
 					type="button"
 					onClick={() => setVisible(false)}
-					className="shrink-0 h-6 w-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-sakura/20 transition-all text-xs"
+					className="shrink-0 h-6 w-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all text-xs"
 					aria-label={t.closeAnnouncement}
 				>
 					✕
@@ -90,6 +91,17 @@ export function PageShell({
 	// 动态注入站点设置
 	React.useEffect(() => {
 		if (!config) return;
+
+		// 应用后端配置的默认主题（仅当用户未自行选择过主题时生效）
+		if (config.site_theme) {
+			const validThemes: ColorTheme[] = ['pink-cute', 'blue-tech', 'glass', 'dark-tech'];
+			const userStoredTheme = getColorTheme();
+			// 如果用户本地没有存储过主题偏好（即使用默认值），则应用后端配置
+			const hasUserChoice = !!localStorage.getItem('color-theme');
+			if (!hasUserChoice && validThemes.includes(config.site_theme as ColorTheme)) {
+				applyColorTheme(config.site_theme as ColorTheme);
+			}
+		}
 
 		// 网站标题
 		if (config.site_title) {
@@ -155,7 +167,23 @@ export function PageShell({
 	}
 
 	return (
-		<div className="min-h-dvh">
+		<div className="min-h-dvh relative">
+			{/* ===== 背景美化层 ===== */}
+			<div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+				{/* 散点网格图案 */}
+				<div
+					className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
+					style={{
+						backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
+						backgroundSize: '28px 28px',
+					}}
+				/>
+				{/* 左上光晕 */}
+				<div className="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 rounded-full bg-primary/[0.04] blur-[120px]" />
+				{/* 右下光晕 */}
+				<div className="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 rounded-full bg-primary/[0.03] blur-[100px]" />
+			</div>
+
 			{showTerms && (
 				<PolicyModal
 					title={t.termsTitle}
@@ -189,7 +217,7 @@ export function PageShell({
 			<main className="mx-auto w-full max-w-5xl px-4 py-6" style={bgStyle}>{children}</main>
 
 		{/* 页脚 */}
-			<footer className="mt-8 border-t border-sakura/20 py-6 text-center text-xs text-muted-foreground">
+		<footer className="mt-8 border-t border-border py-6 text-center text-xs text-muted-foreground">
 				{config?.site_footer_html ? (
 					<div dangerouslySetInnerHTML={{ __html: sanitizeHtml(config.site_footer_html) }} />
 				) : (

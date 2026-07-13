@@ -58,14 +58,21 @@ const config: Config = {
 				deco: ["'Ma Shan Zheng'", "'ZCOOL KuaiLe'", 'cursive'],
 			},
 			boxShadow: {
-			'anime': '0 2px 8px rgba(0,0,0,0.06), 0 6px 24px rgba(244,63,142,0.15)',
-			'anime-lg': '0 4px 16px rgba(0,0,0,0.08), 0 12px 40px rgba(244,63,142,0.22)',
-			'anime-hover': '0 8px 24px rgba(0,0,0,0.10), 0 16px 48px rgba(244,63,142,0.28)',
-			'card': '0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(168,85,247,0.10)',
-			'card-hover': '0 4px 14px rgba(0,0,0,0.09), 0 10px 32px rgba(244,63,142,0.20)',
-			'lavender': '0 4px 20px rgba(167,139,250,0.22)',
-			'glow-pink': '0 0 0 3px rgba(244,63,142,0.28)',
-			'glow-purple': '0 0 0 3px rgba(167,139,250,0.30)',
+			// 现代多层阴影系统 — 替代花哨的彩色阴影
+			'subtle': '0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06)',
+			'card': '0 0 0 1px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)',
+			'card-hover': '0 0 0 1px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.10)',
+			'elevated': '0 0 0 1px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.05), 0 12px 32px rgba(0,0,0,0.10)',
+			'dialog': '0 0 0 1px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.08), 0 24px 56px rgba(0,0,0,0.16)',
+			// 毛玻璃专用 — 柔和且带有微妙的色调
+			'glass': '0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.3)',
+			'glass-hover': '0 2px 6px rgba(0,0,0,0.06), 0 8px 28px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.4)',
+			// 聚焦发光 — 用主色调的微妙 ring
+			'focus': '0 0 0 3px hsl(var(--ring) / 0.25)',
+			// 向下兼容旧类名（无彩色阴影）
+			'anime': '0 0 0 1px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06)',
+			'anime-lg': '0 0 0 1px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.05), 0 12px 32px rgba(0,0,0,0.10)',
+			'anime-hover': '0 0 0 1px rgba(0,0,0,0.04), 0 2px 6px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.10)',
 			},
 			backgroundImage: {
 			'gradient-anime': 'linear-gradient(135deg, #f43f8e, #a855f7, #38bdf8)',

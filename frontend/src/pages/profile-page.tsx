@@ -129,10 +129,10 @@ export function ProfilePage() {
 				</Button>
 
 				{/* 个人资料卡片 */}
-				<div className="relative rounded-2xl overflow-hidden border border-sakura/20 shadow-anime bg-background">
+<div className="relative rounded-2xl overflow-hidden border border-border shadow-card bg-background">
 					{/* 背景图 */}
 					<div
-						className="h-40 sm:h-56 w-full bg-gradient-to-br from-sakura/30 via-lavender/20 to-sky/20"
+						className="h-40 sm:h-56 w-full bg-muted"
 						style={
 							profile?.bg_image
 								? { backgroundImage: `url(${profile.bg_image})`, backgroundSize: 'cover', backgroundPosition: 'center' }
@@ -145,15 +145,15 @@ export function ProfilePage() {
 						{/* 头像 */}
 						<div className="flex items-end justify-between -mt-10 mb-3">
 							<div className="relative">
-								{profile?.avatar_url ? (
+						{profile?.avatar_url ? (
 									<img
 										src={profile.avatar_url}
 										alt={profile.username}
-										className="h-20 w-20 rounded-full border-4 border-background object-cover shadow-lg"
+										className="h-20 w-20 rounded-full border-[3px] border-background object-cover shadow-card"
 									/>
 								) : (
-									<div className="h-20 w-20 rounded-full border-4 border-background bg-gradient-to-br from-sakura/40 to-lavender/40 flex items-center justify-center shadow-lg">
-										<User className="h-9 w-9 text-primary/60" />
+									<div className="h-20 w-20 rounded-full border-[3px] border-background bg-primary/15 flex items-center justify-center shadow-card">
+										<User className="h-9 w-9 text-primary/50" />
 									</div>
 								)}
 								{profile?.role === 'admin' && (
@@ -237,7 +237,7 @@ export function ProfilePage() {
 									<a
 										key={post.id}
 										href={`/post?id=${post.id}`}
-										className="block rounded-xl border border-border/60 bg-muted/30 hover:bg-sakura/5 hover:border-sakura/30 transition-all p-3 group"
+className="block rounded-xl border border-border/60 bg-muted/30 hover:bg-muted/50 hover:border-primary/20 transition-all p-3 group"
 									>
 										<div className="font-medium text-sm group-hover:text-primary transition-colors line-clamp-2 leading-snug">
 											{post.title}
@@ -305,7 +305,7 @@ export function ProfilePage() {
 									<a
 										key={comment.id}
 										href={`/post?id=${comment.post_id}`}
-										className="block rounded-xl border border-border/60 bg-muted/30 hover:bg-sakura/5 hover:border-sakura/30 transition-all p-3 group"
+className="block rounded-xl border border-border/60 bg-muted/30 hover:bg-muted/50 hover:border-primary/20 transition-all p-3 group"
 									>
 										<div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
 											<MessageCircle className="h-3 w-3" />

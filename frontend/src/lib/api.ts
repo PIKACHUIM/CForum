@@ -5,11 +5,13 @@ export type ForumConfig = {
 	turnstile_site_key: string;
 	user_count?: number;
 	jwt_secret_configured?: boolean; // indicates whether JWT_SECRET is set in backend
+	force_login?: boolean; // 是否强制登录才能访问
 	// 站点设置
 	site_title?: string;
 	site_description?: string;
 	site_primary_color?: string;
 	site_favicon_url?: string;
+	site_logo_url?: string;
 	site_announcement?: string;
 	site_icp?: string;
 	site_footer_html?: string;
@@ -24,6 +26,7 @@ export type ForumConfig = {
 	site_post_rate_limit?: string;
 	site_comment_rate_limit?: string;
 	site_keyword_filter?: string;
+	site_theme?: string;
 };
 
 export type Category = {

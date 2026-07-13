@@ -3,11 +3,11 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { getUser, logout, type User } from '@/lib/auth';
-import { getTheme, toggleTheme, type Theme } from '@/lib/theme';
+import { getTheme, toggleTheme, getColorTheme, setColorTheme, COLOR_THEMES, type Theme, type ColorTheme } from '@/lib/theme';
 import type { ForumConfig } from '@/lib/api';
 import { LOCALES, type Locale } from '@/lib/i18n';
 import { useI18n } from '@/hooks/use-i18n';
-import { LogIn, LogOut, Moon, Settings, Shield, Sun, User as UserIcon, UserPlus } from 'lucide-react';
+import { LogIn, LogOut, Moon, Palette, Settings, Shield, Sun, User as UserIcon, UserPlus } from 'lucide-react';
 
 export function SiteHeader({
 	currentUser,
@@ -22,27 +22,40 @@ export function SiteHeader({
 }) {
 	const user = currentUser ?? getUser();
 	const [theme, setTheme] = React.useState<Theme>(() => getTheme());
+	const [colorTheme, setColorThemeState] = React.useState<ColorTheme>(() => getColorTheme());
 	const [spinning, setSpinning] = React.useState(false);
 	const { locale, t, setLocale } = useI18n();
 	const [langOpen, setLangOpen] = React.useState(false);
+	const [themeMenuOpen, setThemeMenuOpen] = React.useState(false);
 	const langMenuRef = React.useRef<HTMLDivElement>(null);
+	const themeMenuRef = React.useRef<HTMLDivElement>(null);
 
 	React.useEffect(() => {
 		function onThemeChange(e: Event) {
 			const next = (e as CustomEvent).detail;
 			if (next === 'light' || next === 'dark') setTheme(next);
 		}
+		function onColorThemeChange(e: Event) {
+			const next = (e as CustomEvent).detail;
+			setColorThemeState(next);
+		}
 		window.addEventListener('theme-change', onThemeChange as any);
+		window.addEventListener('color-theme-change', onColorThemeChange as any);
 		setTheme(getTheme());
-		return () => window.removeEventListener('theme-change', onThemeChange as any);
+		setColorThemeState(getColorTheme());
+		return () => {
+			window.removeEventListener('theme-change', onThemeChange as any);
+			window.removeEventListener('color-theme-change', onColorThemeChange as any);
+		};
 	}, []);
 
 	React.useEffect(() => {
-		if (!langOpen) return;
+		if (!langOpen && !themeMenuOpen) return;
 		function onPointerDown(e: MouseEvent | TouchEvent) {
 			const target = e.target as Node | null;
 			if (!target) return;
-			if (langMenuRef.current && !langMenuRef.current.contains(target)) setLangOpen(false);
+			if (langOpen && langMenuRef.current && !langMenuRef.current.contains(target)) setLangOpen(false);
+			if (themeMenuOpen && themeMenuRef.current && !themeMenuRef.current.contains(target)) setThemeMenuOpen(false);
 		}
 		document.addEventListener('mousedown', onPointerDown);
 		document.addEventListener('touchstart', onPointerDown);
@@ -50,7 +63,7 @@ export function SiteHeader({
 			document.removeEventListener('mousedown', onPointerDown);
 			document.removeEventListener('touchstart', onPointerDown);
 		};
-	}, [langOpen]);
+	}, [langOpen, themeMenuOpen]);
 
 	function handleToggleTheme() {
 		setSpinning(true);
@@ -65,17 +78,25 @@ export function SiteHeader({
 	return (
 		<header className="w-full sticky top-3 z-40">
 			<div className="mx-auto max-w-5xl px-4">
-				<div className="glass rounded-2xl border border-sakura/20 shadow-anime px-5 py-3 flex flex-col gap-0">
+		<div className="glass rounded-2xl border border-border/30 shadow-glass px-5 py-3 flex flex-col gap-0">
 					{/* 主行：Logo + 右侧操作区 */}
 					<div className="flex items-center justify-between gap-4">
-						{/* Logo 区域 */}
+					{/* Logo 区域 */}
 						<a
 							href="/"
 							className="inline-flex items-center gap-2 group"
 						>
-							<span className="text-xl animate-bounce-gentle">🌸</span>
+							{config?.site_logo_url ? (
+								<img
+									src={config.site_logo_url}
+									alt={siteTitle}
+									className="h-8 max-w-[120px] object-contain rounded"
+								/>
+							) : (
+								<span className="text-xl animate-bounce-gentle">🌸</span>
+							)}
 							<div className="flex flex-col">
-			<span className="font-display text-lg font-bold bg-gradient-to-r from-[#f43f8e] to-[#a855f7] bg-clip-text text-transparent group-hover:opacity-80 transition-opacity leading-tight whitespace-nowrap min-w-[4em]">
+<span className="font-display text-lg font-bold text-primary group-hover:opacity-80 transition-opacity leading-tight whitespace-nowrap min-w-[4em]">
 									{siteTitle}
 								</span>
 								{siteDesc ? (
@@ -90,7 +111,7 @@ export function SiteHeader({
 							<button
 								type="button"
 								onClick={handleToggleTheme}
-								className="h-9 w-9 rounded-full flex items-center justify-center hover:bg-sakura/10 transition-all duration-200 hover:scale-110"
+							className="h-9 w-9 rounded-full flex items-center justify-center hover:bg-muted transition-all duration-200 hover:scale-110"
 								title={t.toggleTheme}
 							>
 								<span className={spinning ? 'animate-spin-slow' : 'transition-transform duration-300'}>
@@ -102,12 +123,46 @@ export function SiteHeader({
 								<span className="sr-only">{t.toggleTheme}</span>
 							</button>
 
+							{/* 颜色主题选择器 */}
+							<div className="relative" ref={themeMenuRef}>
+								<button
+									type="button"
+									onClick={() => setThemeMenuOpen((v) => !v)}
+								className="h-9 w-9 rounded-full flex items-center justify-center hover:bg-muted transition-all duration-200 hover:scale-110"
+									title={t.colorTheme || '颜色主题'}
+									aria-haspopup="listbox"
+									aria-expanded={themeMenuOpen}
+								>
+									<Palette className="h-4 w-4 text-primary" />
+								</button>
+								{themeMenuOpen ? (
+									<div className="absolute right-0 top-full z-50 mt-2 w-44 rounded-xl border-2 border-primary/20 bg-background/95 p-1.5 shadow-anime backdrop-blur-sm">
+										{COLOR_THEMES.map((ct) => (
+											<button
+												key={ct.value}
+												type="button"
+												role="option"
+												aria-selected={ct.value === colorTheme}
+												className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-primary/10 ${ct.value === colorTheme ? 'font-semibold text-primary bg-primary/5' : ''}`}
+												onClick={() => {
+													setColorTheme(ct.value);
+													setThemeMenuOpen(false);
+												}}
+											>
+												<span className="text-base">{ct.icon}</span>
+												<span>{t[`theme_${ct.value.replace('-', '_')}` as keyof typeof t] || ct.value}</span>
+											</button>
+										))}
+									</div>
+								) : null}
+							</div>
+
 							{/* 语言切换按钮 */}
 							<div className="relative" ref={langMenuRef}>
 								<button
 									type="button"
 									onClick={() => setLangOpen((v) => !v)}
-									className="h-9 px-2 rounded-full flex items-center gap-1 hover:bg-sakura/10 transition-all duration-200 text-sm"
+								className="h-9 px-2 rounded-full flex items-center gap-1 hover:bg-muted transition-all duration-200 text-sm"
 									title={t.switchLanguage}
 									aria-haspopup="listbox"
 									aria-expanded={langOpen}
@@ -116,14 +171,14 @@ export function SiteHeader({
 									<span className="hidden sm:inline text-xs text-muted-foreground">{currentLang.label}</span>
 								</button>
 								{langOpen ? (
-									<div className="absolute right-0 top-full z-50 mt-2 w-36 rounded-xl border-2 border-sakura/20 bg-background/95 p-1 shadow-anime backdrop-blur-sm">
+<div className="absolute right-0 top-full z-50 mt-2 w-36 rounded-xl border border-border bg-background/98 p-1 shadow-elevated backdrop-blur-sm">
 										{LOCALES.map((l) => (
 											<button
 												key={l.value}
 												type="button"
 												role="option"
 												aria-selected={l.value === locale}
-												className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors hover:bg-sakura/10 ${l.value === locale ? 'font-semibold text-primary' : ''}`}
+className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors hover:bg-muted ${l.value === locale ? 'font-semibold text-primary' : ''}`}
 												onClick={() => {
 													setLocale(l.value as Locale);
 													setLangOpen(false);
@@ -144,18 +199,18 @@ export function SiteHeader({
 										href={`/profile?id=${user.id}`}
 										className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
 									>
-										{/* 头像 */}
-										<span className="avatar-anime transition-transform duration-300 hover:rotate-12">
+									{/* 头像 */}
+										<span className="avatar-anime h-9 w-9 transition-transform duration-300 hover:scale-110">
 											{user.avatar_url ? (
 												<img
 													src={user.avatar_url}
 													alt=""
-													className="h-7 w-7 rounded-full object-cover"
+													className="h-9 w-9 rounded-full object-cover"
 													loading="lazy"
 													referrerPolicy="no-referrer"
 												/>
 											) : (
-						<span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#f43f8e] to-[#a855f7] text-white">
+						<span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
 							<UserIcon className="h-5 w-5" />
 												</span>
 											)}
@@ -189,7 +244,7 @@ export function SiteHeader({
 										</a>
 									</Button>
 
-									<Separator orientation="vertical" className="h-6 bg-sakura/30" />
+<Separator orientation="vertical" className="h-6 bg-border" />
 
 									{/* 退出按钮 */}
 									<Button
@@ -228,7 +283,7 @@ export function SiteHeader({
 					{/* 工具栏行（可选，由页面传入） */}
 					{toolbar ? (
 						<>
-							<div className="mt-2.5 border-t border-sakura/15" />
+<div className="mt-2.5 border-t border-border" />
 							<div className="pt-2.5 pb-0.5">
 								{toolbar}
 							</div>

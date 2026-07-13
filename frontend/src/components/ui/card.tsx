@@ -9,7 +9,7 @@ export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 		className={cn(
 				'card-anime rounded-2xl border border-border/60 bg-card text-card-foreground shadow-card',
 				'transition-[box-shadow,border-color,transform] duration-200 ease-out',
-				'hover:border-sakura/50 hover:shadow-card-hover hover:-translate-y-0.5',
+			'hover:border-ring/30 hover:shadow-card-hover',
 				className
 			)}
 			{...props}

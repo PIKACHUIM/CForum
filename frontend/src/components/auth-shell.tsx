@@ -3,23 +3,27 @@ import { cn } from '@/lib/utils';
 import { useConfig } from '@/hooks/use-config';
 
 /**
- * 二次元风格认证页面背景容器
- * 包含渐变背景、浮动装饰元素和毛玻璃卡片效果
+ * 现代毛玻璃风格认证页面背景容器
+ * 包含论坛品牌标识展示区
  */
 export function AuthPageShell({
 	children,
-	className
+	className,
+	icon,
+	subtitle
 }: {
 	children: React.ReactNode;
 	className?: string;
+	/** 当没有自定义 Logo 时使用的 emoji 图标 */
+	icon?: string;
+	/** 品牌副标题，如"欢迎回来" */
+	subtitle?: string;
 }) {
 	const { config } = useConfig();
 
-	// 动态设置站点标题和图标（与 PageShell 保持一致）
 	React.useEffect(() => {
 		if (!config) return;
 		if (config.site_title) {
-			// 保留页面原有的子标题前缀（如"登录 - "）
 			const current = document.title;
 			const sep = current.indexOf(' - ');
 			const prefix = sep !== -1 ? current.slice(0, sep + 3) : '';
@@ -36,29 +40,62 @@ export function AuthPageShell({
 		}
 	}, [config]);
 
+	const siteTitle = config?.site_title || '论坛';
+	const siteLogo = config?.site_logo_url;
+
 	return (
 		<div className={cn(
-			'min-h-dvh relative overflow-hidden',
-			'bg-gradient-to-br from-[#FFF0F5] via-[#F5F0FF] to-[#F0F8FF]',
-			'dark:from-[#1A1B2E] dark:via-[#1E1A2E] dark:to-[#1A2030]',
+			'min-h-dvh relative overflow-hidden bg-background',
 			className
 		)}>
-			{/* 浮动装饰元素 */}
+			{/* 增强背景光晕 */}
 			<div className="pointer-events-none select-none absolute inset-0 overflow-hidden">
-				<span className="deco-float" style={{ top: '8%', left: '5%', animationDelay: '0s', fontSize: '2rem' }}>🌸</span>
-				<span className="deco-float" style={{ top: '15%', right: '8%', animationDelay: '0.5s', fontSize: '1.5rem' }}>⭐</span>
-				<span className="deco-float" style={{ top: '60%', left: '3%', animationDelay: '1s', fontSize: '1.2rem' }}>✨</span>
-				<span className="deco-float" style={{ top: '75%', right: '5%', animationDelay: '1.5s', fontSize: '1.8rem' }}>🌙</span>
-				<span className="deco-float" style={{ top: '40%', right: '3%', animationDelay: '2s', fontSize: '1rem' }}>💫</span>
-				<span className="deco-float" style={{ top: '85%', left: '10%', animationDelay: '0.8s', fontSize: '1.3rem' }}>🌟</span>
-				{/* 大背景圆形装饰 */}
-				<div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-sakura/10 blur-3xl" />
-				<div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-lavender/10 blur-3xl" />
-				<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full bg-sky/5 blur-2xl" />
+				{/* 主色调光晕 - 左上 */}
+				<div className="absolute -top-32 -left-32 w-[36rem] h-[36rem] rounded-full bg-primary/8 blur-[130px] animate-pulse" />
+				{/* 辅色调光晕 - 右下 */}
+				<div className="absolute -bottom-32 -right-32 w-[30rem] h-[30rem] rounded-full bg-accent/12 blur-[110px]" />
+				{/* 点缀光晕 - 中上 */}
+				<div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[20rem] h-[20rem] rounded-full bg-primary/4 blur-[90px]" />
 			</div>
 
-			{/* 内容区 */}
-			<main className="relative z-10 mx-auto flex min-h-dvh max-w-5xl items-center justify-center px-4 py-10">
+			{/* 装饰网格 */}
+			<div className="pointer-events-none select-none absolute inset-0 opacity-[0.03]"
+				style={{
+					backgroundImage: 'radial-gradient(circle, hsl(var(--primary)) 1px, transparent 1px)',
+					backgroundSize: '40px 40px'
+				}}
+			/>
+
+			<main className="relative z-10 mx-auto flex min-h-dvh max-w-5xl flex-col items-center justify-center gap-8 px-4 py-10">
+				{/* 论坛品牌标识区 */}
+				<div className="flex flex-col items-center gap-3 animate-slide-up">
+					{siteLogo ? (
+						<img
+							src={siteLogo}
+							alt={siteTitle}
+							className="h-16 max-w-[200px] object-contain rounded-xl"
+						/>
+					) : (
+						<div className="flex items-center justify-center h-16 w-16 rounded-2xl bg-primary/10 ring-1 ring-primary/20">
+							<span className="text-3xl animate-bounce-gentle">{icon || '🌸'}</span>
+						</div>
+					)}
+					<h1 className="font-display text-2xl sm:text-3xl font-bold text-primary tracking-wide">
+						{siteTitle}
+					</h1>
+					{subtitle && (
+						<>
+							<div className="flex items-center gap-3 w-48">
+								<div className="h-px flex-1 bg-border" />
+								<span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
+									{subtitle}
+								</span>
+								<div className="h-px flex-1 bg-border" />
+							</div>
+						</>
+					)}
+				</div>
+
 				{children}
 			</main>
 		</div>
@@ -66,7 +103,7 @@ export function AuthPageShell({
 }
 
 /**
- * 二次元风格认证卡片
+ * 现代毛玻璃认证卡片
  */
 export function AuthCard({
 	children,
@@ -78,12 +115,9 @@ export function AuthCard({
 	return (
 		<div className={cn(
 			'w-full max-w-md animate-slide-up',
-			'glass rounded-2xl shadow-anime-lg',
-			'border border-sakura/20',
+			'glass rounded-2xl',
 			className
 		)}>
-			{/* 顶部渐变装饰条 */}
-			<div className="h-1 rounded-t-2xl bg-gradient-to-r from-sakura via-lavender to-sky" />
 			{children}
 		</div>
 	);

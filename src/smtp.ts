@@ -53,27 +53,65 @@ async function checkMX(email: string): Promise<boolean> {
     }
 }
 
-// Resend API 发送函数
-// 环境变量：
-//   RESEND_KEY       - Resend API Key（必需）
-//   RESEND_FROM      - 发件人邮箱地址，例如：noreply@example.com（必需，需在 Resend 中验证域名）
-//   RESEND_FROM_NAME - 发件人显示名称（可选，默认"论坛管理员"）
-async function sendViaResend(env: any, to: string, subject: string, htmlContent: string) {
-    if (!env.RESEND_KEY) {
-        throw new Error('环境变量缺少 RESEND_KEY，请在 Cloudflare Worker Secrets 中配置');
-    }
-    if (!env.RESEND_FROM) {
-        throw new Error('环境变量缺少 RESEND_FROM，请设置发件人邮箱地址');
+// 获取 Resend 配置，优先从 D1 数据库 settings 表读取，其次从环境变量读取
+// D1 settings 键名：
+//   resend_key       - Resend API Key
+//   resend_from      - 发件人邮箱地址
+//   resend_from_name - 发件人显示名称（可选）
+// 环境变量（回退方案）：
+//   RESEND_KEY       - Resend API Key
+//   RESEND_FROM      - 发件人邮箱地址
+//   RESEND_FROM_NAME - 发件人显示名称
+async function getResendConfig(env: any, db?: any): Promise<{ key: string; from: string; fromName: string }> {
+    let key = '';
+    let from = '';
+    let fromName = DEFAULT_FROM_NAME;
+
+    // 1. 优先从 D1 数据库 settings 表读取
+    if (db) {
+        try {
+            const settings = await db.prepare("SELECT key, value FROM settings WHERE key IN ('resend_key', 'resend_from', 'resend_from_name')").all();
+            if (settings.results) {
+                for (const row of settings.results as any[]) {
+                    if (row.key === 'resend_key' && row.value) key = row.value;
+                    if (row.key === 'resend_from' && row.value) from = row.value;
+                    if (row.key === 'resend_from_name' && row.value) fromName = row.value;
+                }
+            }
+            if (key && from) {
+                console.log('[Resend] Using config from D1 database settings');
+                return { key, from, fromName };
+            }
+        } catch (e) {
+            console.warn('[Resend] Failed to read config from D1, falling back to env vars:', e);
+        }
     }
 
-    const fromName = env.RESEND_FROM_NAME || DEFAULT_FROM_NAME;
-    const from = `${fromName} <${env.RESEND_FROM}>`;
+    // 2. 回退到环境变量
+    if (env.RESEND_KEY) key = env.RESEND_KEY;
+    if (env.RESEND_FROM) from = env.RESEND_FROM;
+    if (env.RESEND_FROM_NAME) fromName = env.RESEND_FROM_NAME;
+
+    if (!key) {
+        throw new Error('缺少 Resend API Key，请在管理后台「邮件设置」中配置或设置环境变量 RESEND_KEY');
+    }
+    if (!from) {
+        throw new Error('缺少发件人邮箱地址，请在管理后台「邮件设置」中配置或设置环境变量 RESEND_FROM');
+    }
+
+    console.log('[Resend] Using config from environment variables');
+    return { key, from, fromName };
+}
+
+// Resend API 发送函数
+async function sendViaResend(config: { key: string; from: string; fromName: string }, to: string, subject: string, htmlContent: string) {
+    const from = `${config.fromName} <${config.from}>`;
 
     console.log('[Resend] Sending email via Resend API...');
     const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
-            'Authorization': `Bearer ${env.RESEND_KEY}`,
+            'Authorization': `Bearer ${config.key}`,
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -94,7 +132,9 @@ async function sendViaResend(env: any, to: string, subject: string, htmlContent:
 }
 
 // Main export
-export async function sendEmail(to: string, subject: string, htmlContent: string, env?: any) {
+// env: Cloudflare Worker env bindings (用于回退读取环境变量)
+// db: D1 database binding (优先从 settings 表读取 resend_* 配置)
+export async function sendEmail(to: string, subject: string, htmlContent: string, env?: any, db?: any) {
     console.log(`[Email] Starting email send to ${to} - Subject: ${subject}`);
 
     // 1. Check MX Records first
@@ -109,7 +149,8 @@ export async function sendEmail(to: string, subject: string, htmlContent: string
 
     // 2. Send via Resend API
     try {
-        await sendViaResend(env || {}, to, subject, htmlContent);
+        const config = await getResendConfig(env || {}, db);
+        await sendViaResend(config, to, subject, htmlContent);
         console.log(`[Email] ✓ Email successfully sent to ${to}`);
     } catch (e) {
         console.error('[Email] Failed to send email:', e);

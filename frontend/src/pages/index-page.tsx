@@ -22,12 +22,12 @@ export function IndexPage() {
 	const token = getToken();
 	const user = React.useMemo(() => getUser(), [token]);
 
-	// 强制登录：未登录用户直接跳转到登录页
+	// 强制登录（仅当管理员启用该设置时）
 	React.useEffect(() => {
-		if (!user) {
+		if (config?.force_login && !user) {
 			window.location.href = '/login';
 		}
-	}, [user]);
+	}, [config?.force_login, user]);
 
 	const [banner, setBanner] = React.useState<string>('');
 	const [categories, setCategories] = React.useState<Category[]>([]);
@@ -535,7 +535,7 @@ export function IndexPage() {
 			</label>
 			<select
 				id="category-filter"
-				className="h-8 rounded-lg border border-border bg-background px-2.5 text-sm transition-all hover:border-sakura/60 focus:outline-none focus:border-sakura focus:shadow-glow-pink"
+className="h-8 rounded-lg border border-border bg-background px-2.5 text-sm transition-all hover:border-ring/40 focus:outline-none focus:border-ring focus:shadow-focus"
 				value={selectedCategory}
 				onChange={(e) => {
 					setSelectedCategory(e.target.value);
@@ -555,7 +555,7 @@ export function IndexPage() {
 			</label>
 			<select
 				id="sort-filter"
-				className="h-8 rounded-lg border border-border bg-background px-2.5 text-sm transition-all hover:border-sakura/60 focus:outline-none focus:border-sakura focus:shadow-glow-pink"
+className="h-8 rounded-lg border border-border bg-background px-2.5 text-sm transition-all hover:border-ring/40 focus:outline-none focus:border-ring focus:shadow-focus"
 				value={sortOption}
 				onChange={(e) => {
 					setSortOption(e.target.value);
@@ -613,7 +613,7 @@ export function IndexPage() {
 					type="button"
 					className={`h-8 px-2.5 flex items-center gap-1 text-sm transition-colors ${
 						viewMode === 'list'
-							? 'bg-sakura/20 text-primary'
+							? 'bg-muted text-primary font-medium'
 							: 'hover:bg-muted text-muted-foreground'
 					}`}
 					onClick={() => setViewMode('list')}
@@ -626,7 +626,7 @@ export function IndexPage() {
 					type="button"
 					className={`h-8 px-2.5 flex items-center gap-1 text-sm transition-colors ${
 						viewMode === 'waterfall'
-							? 'bg-sakura/20 text-primary'
+							? 'bg-muted text-primary font-medium'
 							: 'hover:bg-muted text-muted-foreground'
 					}`}
 					onClick={() => setViewMode('waterfall')}
@@ -638,8 +638,8 @@ export function IndexPage() {
 		</div>
 	);
 
-	// 未登录时显示空白加载态，等待跳转
-	if (!user) {
+	// 未登录 + 开启强制登录时显示跳转提示
+	if (!user && config?.force_login) {
 		return (
 			<PageShell>
 				<div className="flex items-center justify-center py-24 text-muted-foreground text-sm">
@@ -653,11 +653,11 @@ export function IndexPage() {
 	return (
 		<PageShell toolbar={toolbar}>
 			<div className="space-y-6">
-				{banner ? <div className="rounded-xl border border-sakura/30 bg-sakura/5 p-3 text-sm">{banner}</div> : null}
+{banner ? <div className="rounded-xl border border-border bg-muted/20 p-3 text-sm">{banner}</div> : null}
 
 				{user ? (
 					<Card>
-						<CardHeader className="rounded-t-2xl bg-gradient-to-r from-sakura/20 via-lavender/20 to-sky/20 border-b border-sakura/20">
+<CardHeader className="rounded-t-2xl bg-muted/30 border-b border-border">
 							<CardTitle className="flex items-center justify-between gap-2">
 								<span className="flex items-center gap-2">✏️ {t.newPost}</span>
 								<Button type="button" variant="outline" size="sm" onClick={() => setCreateOpen((v) => !v)}>
@@ -681,7 +681,7 @@ export function IndexPage() {
 									<Label htmlFor="new-category">{t.postCategory}</Label>
 									<select
 										id="new-category"
-										className="h-10 w-full rounded-xl border-2 border-border bg-background px-3 text-sm transition-all hover:border-sakura/60 focus:outline-none focus:border-sakura focus:shadow-glow-pink"
+className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm transition-all hover:border-ring/40 focus:outline-none focus:border-ring focus:shadow-focus"
 											value={newCategoryId}
 											onChange={(e) => setNewCategoryId(e.target.value)}
 										>
@@ -812,15 +812,15 @@ export function IndexPage() {
 										<div className="p-4">
 											<div className="flex gap-4">
 												{/* 封面图占位 */}
-<div className="h-20 w-28 shrink-0 rounded-md bg-gradient-to-br from-[#f43f8e]/15 to-[#a855f7]/15" />
+<div className="h-20 w-28 shrink-0 rounded-md bg-muted" />
 												<div className="flex-1 space-y-2.5 min-w-0">
 													{/* 标题行 */}
 													<div className="flex items-center gap-2">
-														<div className="h-5 rounded-full bg-gradient-to-r from-sakura/25 to-lavender/20" style={{ width: `${55 + (i * 13) % 30}%` }} />
+<div className="h-5 rounded-full bg-muted/50" style={{ width: `${55 + (i * 13) % 30}%` }} />
 													</div>
 													{/* 作者行 */}
 													<div className="flex items-center gap-2">
-														<div className="h-6 w-6 rounded-full bg-sakura/25 shrink-0" />
+<div className="h-6 w-6 rounded-full bg-muted/50 shrink-0" />
 														<div className="h-3.5 w-20 rounded-full bg-muted/60" />
 														<div className="h-3.5 w-1 rounded-full bg-muted/40" />
 														<div className="h-3.5 w-16 rounded-full bg-muted/50" />
@@ -849,10 +849,10 @@ export function IndexPage() {
 									<div key={i} className="break-inside-avoid mb-4 rounded-2xl border bg-card shadow-card overflow-hidden animate-pulse">
 										{/* 封面图占位（高度随机） */}
 										{i % 3 !== 2 ? (
-<div className="w-full bg-gradient-to-br from-[#f43f8e]/15 to-[#a855f7]/15" style={{ height: `${100 + (i * 37) % 80}px` }} />
+<div className="w-full bg-muted" style={{ height: `${100 + (i * 37) % 80}px` }} />
 										) : null}
 										<div className="p-4 space-y-2.5">
-											<div className="h-4 rounded-full bg-gradient-to-r from-sakura/25 to-lavender/20" style={{ width: `${60 + (i * 17) % 30}%` }} />
+<div className="h-4 rounded-full bg-muted/50" style={{ width: `${60 + (i * 17) % 30}%` }} />
 											<div className="space-y-1.5">
 												<div className="h-3 rounded-full bg-muted/50" style={{ width: '90%' }} />
 												<div className="h-3 rounded-full bg-muted/40" style={{ width: `${50 + (i * 13) % 35}%` }} />
@@ -988,18 +988,18 @@ export function IndexPage() {
 												</div>
 									<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
 									<a href={`/profile?id=${p.author_id}`} className="inline-flex items-center gap-2 hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>
-										<span className="avatar-anime">
+										<span className="avatar-anime h-8 w-8">
 										{p.author_avatar ? (
 											<img
 												src={p.author_avatar}
 												alt=""
-												className="h-6 w-6 rounded-full object-cover"
+												className="h-8 w-8 rounded-full object-cover"
 												loading="lazy"
 												referrerPolicy="no-referrer"
 											/>
 										) : (
-<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#f43f8e] to-[#a855f7] text-white text-[10px]">
-												<User className="h-3.5 w-3.5" />
+<span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+												<User className="h-4 w-4" />
 											</span>
 										)}
 										</span>
@@ -1118,12 +1118,12 @@ export function IndexPage() {
 											<p className="text-sm text-muted-foreground leading-relaxed">{excerpt}</p>
 										) : null}
 										<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-													<a href={`/profile?id=${p.author_id}`} className="inline-flex items-center gap-1.5 hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>
-														<span className="avatar-anime">
+												<a href={`/profile?id=${p.author_id}`} className="inline-flex items-center gap-1.5 hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>
+														<span className="avatar-anime h-7 w-7">
 															{p.author_avatar ? (
-																<img src={p.author_avatar} alt="" className="h-5 w-5 rounded-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
+																<img src={p.author_avatar} alt="" className="h-7 w-7 rounded-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
 															) : (
-<span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-[#f43f8e] to-[#a855f7] text-white text-[9px]"><User className="h-3 w-3" /></span>
+<span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground"><User className="h-3.5 w-3.5" /></span>
 															)}
 														</span>
 														<span className="text-foreground">{p.author_name}</span>

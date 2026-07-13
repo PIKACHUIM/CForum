@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useConfig } from '@/hooks/use-config';
 import { useI18n } from '@/hooks/use-i18n';
 import { getSecurityHeaders } from '@/lib/api';
+import { setToken, setUser } from '@/lib/auth';
 
 // 默认用户协议
 const DEFAULT_TERMS = `用户协议
@@ -77,15 +78,15 @@ function PolicyModal({ title, content, onClose }: { title: string; content: stri
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center p-4">
 			<div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-			<div className="relative z-10 w-full max-w-lg max-h-[70vh] flex flex-col rounded-2xl border border-sakura/30 bg-background shadow-2xl">
-				<div className="flex items-center justify-between px-5 py-4 border-b border-sakura/20 bg-gradient-to-r from-sakura/10 to-lavender/10 rounded-t-2xl">
+		<div className="relative z-10 w-full max-w-lg max-h-[70vh] flex flex-col rounded-2xl border border-border bg-background shadow-elevated">
+				<div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/30 rounded-t-2xl">
 					<h3 className="font-display font-bold text-base">{title}</h3>
 					<button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors text-lg leading-none">✕</button>
 				</div>
 				<div className="overflow-y-auto flex-1 p-5">
 					<pre className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed font-sans">{content}</pre>
 				</div>
-				<div className="px-5 py-3 border-t border-sakura/20">
+				<div className="px-5 py-3 border-t border-border">
 					<Button size="sm" className="w-full" onClick={onClose}>{t.iHaveRead}</Button>
 				</div>
 			</div>
@@ -148,6 +149,13 @@ export function RegisterPage() {
 				throw new Error(data?.error || t.registerFailed);
 			}
 			setSuccess(t.registerSuccess);
+			// 注册成功后自动登录
+			if (data.token && data.user) {
+				setToken(data.token);
+				setUser(data.user);
+				window.location.href = '/';
+				return;
+			}
 			setEmail('');
 			setUsername('');
 			setPassword('');
@@ -161,19 +169,18 @@ export function RegisterPage() {
 	}
 
 	return (
-		<AuthPageShell>
+		<AuthPageShell icon="✨" subtitle={t.joinUs}>
 		{showTerms && <PolicyModal title={t.termsTitle} content={termsContent} onClose={() => setShowTerms(false)} />}
 		{showPrivacy && <PolicyModal title={t.privacyTitle} content={privacyContent} onClose={() => setShowPrivacy(false)} />}
 
 			<AuthCard>
 				<div className="p-8">
-					{/* 标题 */}
+					{/* 卡片标题 */}
 					<div className="text-center mb-8">
-						<div className="text-4xl mb-3 animate-bounce-gentle">✨</div>
-					<h1 className="font-display text-2xl font-bold bg-gradient-to-r from-[#f43f8e] to-[#a855f7] bg-clip-text text-transparent">
-						{t.joinUs}
-					</h1>
-					<p className="text-sm text-muted-foreground mt-1">{t.registerSubtitle}</p>
+						<h2 className="font-display text-xl font-bold text-foreground">
+							{t.registerBtn}
+						</h2>
+						<p className="text-sm text-muted-foreground mt-1">{t.registerSubtitle}</p>
 					</div>
 
 					<form className="space-y-5" onSubmit={handleSubmit}>
@@ -231,11 +238,11 @@ export function RegisterPage() {
 						</div>
 
 					{/* 用户协议勾选 */}
-					<div className="space-y-3 rounded-xl border border-sakura/20 bg-sakura/5 p-3">
+				<div className="space-y-3 rounded-xl border border-border bg-muted/20 p-3">
 						<label className="flex items-start gap-2.5 cursor-pointer group">
 							<input
 								type="checkbox"
-								className="mt-0.5 h-4 w-4 rounded border-sakura/40 accent-pink-500 cursor-pointer"
+								className="mt-0.5 h-4 w-4 rounded border-border cursor-pointer accent-primary"
 								checked={agreeTerms}
 								onChange={(e) => setAgreeTerms(e.target.checked)}
 							/>
@@ -253,7 +260,7 @@ export function RegisterPage() {
 						<label className="flex items-start gap-2.5 cursor-pointer group">
 							<input
 								type="checkbox"
-								className="mt-0.5 h-4 w-4 rounded border-sakura/40 accent-pink-500 cursor-pointer"
+className="mt-0.5 h-4 w-4 rounded border-border cursor-pointer accent-primary"
 								checked={agreePrivacy}
 								onChange={(e) => setAgreePrivacy(e.target.checked)}
 							/>

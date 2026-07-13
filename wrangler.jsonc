@@ -2,6 +2,9 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "cfwforum-work",
 	"main": "src/index.ts",
+	"assets": {
+		"directory": "./public"
+	},
 	"compatibility_date": "2025-09-27",
 	"compatibility_flags": [
 		"global_fetch_strictly_public"
@@ -13,7 +16,7 @@
 		{
 			"binding": "cfwforum_db",
 			"database_name": "cfwforum-data",
-			"database_id": "********************************",
+			"database_id": "*****************************",
 			"remote": true,
 			"migrations_dir": "migrations"
 		}
@@ -25,6 +28,15 @@
 		}
 	],
 	"workers_dev": true,
+	"vars": {
+		"WORKER_URL": "********************************",
+		"JWT_SECRET": "********************************",
+		"TURNSTILE_SITE_KEY": "********************************",
+		"TURNSTILE_SECRET_KEY": "********************************",
+		"RESEND_KEY": "********************************",
+		"RESEND_FROM": "********************************",
+		"RESEND_FROM_NAME": "********************************"
+	},
 	"env": {
 		"development": {
 			"vars": {

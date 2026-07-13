@@ -9,10 +9,10 @@ const buttonVariants = cva(
 	{
 		variants: {
 			variant: {
-				default: 'rounded-full bg-gradient-to-r from-[#e879a0] to-[#a855f7] text-white shadow-anime hover:shadow-anime-hover hover:scale-105 hover:brightness-105',
-				secondary: 'rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:scale-105',
-				outline: 'rounded-full border-2 border-sakura bg-background text-foreground hover:bg-sakura/10 hover:scale-105',
-				ghost: 'rounded-full hover:bg-sakura/10 hover:text-primary hover:scale-105',
+			default: 'rounded-full bg-primary text-primary-foreground shadow-card hover:shadow-card-hover hover:scale-[1.02]',
+				secondary: 'rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:scale-[1.02]',
+				outline: 'rounded-full border border-border bg-background text-foreground hover:bg-muted hover:scale-[1.02]',
+				ghost: 'rounded-full hover:bg-muted hover:text-foreground hover:scale-[1.02]',
 				destructive: 'rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:scale-105',
 				link: 'text-primary underline-offset-4 hover:underline',
 			},

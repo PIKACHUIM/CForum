@@ -221,7 +221,7 @@ function PostsTab() {
 					<Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
 					<Input value={q} onChange={e => setQ(e.target.value)} placeholder="搜索标题/内容…" className="pl-9 h-9" onKeyDown={e => e.key === 'Enter' && load(0)} />
 				</div>
-				<select value={status} onChange={e => { setStatus(e.target.value); }} className="h-9 rounded-xl border-2 border-border bg-background px-3 text-sm focus:outline-none focus:border-sakura">
+			<select value={status} onChange={e => { setStatus(e.target.value); }} className="h-9 rounded-xl border-2 border-border bg-background px-3 text-sm focus:outline-none focus:border-ring">
 					<option value="">全部状态</option>
 					<option value="normal">正常</option>
 					<option value="hidden">已隐藏</option>
@@ -440,6 +440,7 @@ function UsersTab({ currentUserId }: { currentUserId?: number }) {
 	const [editEmail, setEditEmail] = React.useState('');
 	const [editAvatarUrl, setEditAvatarUrl] = React.useState('');
 	const [editPassword, setEditPassword] = React.useState('');
+	const [editRole, setEditRole] = React.useState('');
 	const [editLoading, setEditLoading] = React.useState(false);
 	// 确认弹窗
 	const [confirmOpen, setConfirmOpen] = React.useState(false);
@@ -510,12 +511,33 @@ function UsersTab({ currentUserId }: { currentUserId?: number }) {
 		setConfirmOpen(true);
 	}
 
+	function toggleRole(u: any) {
+		const newRole = u.role === 'admin' ? 'user' : 'admin';
+		const actionLabel = newRole === 'admin' ? '设置为管理员' : '取消管理员';
+		setConfirmConfig({
+			title: `${actionLabel}`,
+			desc: `确定将「${u.username}」${actionLabel}？`,
+			onOk: async () => {
+				try {
+					await apiFetch(`/admin/users/${u.id}/role`, {
+						method: 'POST', headers: getSecurityHeaders('POST'),
+						body: JSON.stringify({ role: newRole })
+					});
+					toast('success', actionLabel + '成功');
+					load(offset);
+				} catch (e: any) { toast('error', e?.message || '操作失败'); }
+			}
+		});
+		setConfirmOpen(true);
+	}
+
 	function openEdit(u: any) {
 		setEditUser(u);
 		setEditUsername(u.username || '');
 		setEditEmail(u.email || '');
 		setEditAvatarUrl(u.avatar_url || '');
 		setEditPassword('');
+		setEditRole(u.role || 'user');
 		setEditOpen(true);
 	}
 
@@ -529,7 +551,8 @@ function UsersTab({ currentUserId }: { currentUserId?: number }) {
 					email: editEmail || undefined,
 					username: editUsername || undefined,
 					avatar_url: editAvatarUrl,
-					password: editPassword || undefined
+					password: editPassword || undefined,
+					role: editRole !== editUser.role ? editRole : undefined
 				})
 			});
 			toast('success', '用户信息已保存');
@@ -579,7 +602,7 @@ function UsersTab({ currentUserId }: { currentUserId?: number }) {
 									<span className="inline-flex items-center gap-2">
 										{u.avatar_url
 											? <img src={u.avatar_url} alt="" className="h-6 w-6 rounded-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
-: <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#f43f8e] to-[#a855f7] text-white text-[10px]"><UserIcon className="h-3.5 w-3.5" /></span>
+: <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px]"><UserIcon className="h-3.5 w-3.5" /></span>
 										}
 										<span className="font-medium">{u.username}</span>
 										{u.role === 'admin' && <span className="inline-flex items-center gap-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 dark:text-indigo-300"><Shield className="h-3 w-3" /></span>}
@@ -596,6 +619,10 @@ function UsersTab({ currentUserId }: { currentUserId?: number }) {
 								<td className="px-3 py-2">
 									<div className="flex flex-wrap items-center gap-1">
 										<button title="编辑" onClick={() => openEdit(u)} className="p-1 rounded hover:bg-sky-100 text-sky-600 transition-colors text-xs px-2 py-0.5 border border-sky-200 rounded-lg">编辑</button>
+										{u.role !== 'admin'
+											? <button title="设为管理员" onClick={() => toggleRole(u)} className="p-1 rounded hover:bg-indigo-100 text-indigo-600 transition-colors"><Shield className="h-3.5 w-3.5" /></button>
+											: <button title="取消管理员" onClick={() => toggleRole(u)} className="p-1 rounded hover:bg-orange-100 text-orange-600 transition-colors"><UserIcon className="h-3.5 w-3.5" /></button>
+										}
 										{!u.verified && <button title="手动验证" onClick={() => manualVerify(u.id)} className="p-1 rounded hover:bg-emerald-100 text-emerald-600 transition-colors text-xs px-2 py-0.5 border border-emerald-200 rounded-lg">验证</button>}
 										{(u.status || 'normal') !== 'banned'
 											? <button title="封禁" onClick={() => doAction(u.id, 'ban')} className="p-1 rounded hover:bg-red-100 text-red-600 transition-colors"><Ban className="h-3.5 w-3.5" /></button>
@@ -625,13 +652,20 @@ function UsersTab({ currentUserId }: { currentUserId?: number }) {
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>编辑用户</DialogTitle>
-						<DialogDescription>修改用户名 / 邮箱 / 头像 / 密码</DialogDescription>
+						<DialogDescription>修改用户名 / 邮箱 / 头像 / 密码 / 角色</DialogDescription>
 					</DialogHeader>
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2"><Label>用户名</Label><Input value={editUsername} onChange={e => setEditUsername(e.target.value)} maxLength={20} /></div>
 						<div className="grid gap-2"><Label>邮箱</Label><Input value={editEmail} onChange={e => setEditEmail(e.target.value)} type="email" /></div>
 						<div className="grid gap-2"><Label>头像 URL</Label><Input value={editAvatarUrl} onChange={e => setEditAvatarUrl(e.target.value)} /></div>
 						<div className="grid gap-2"><Label>新密码 <span className="text-muted-foreground text-xs">(留空不变)</span></Label><Input value={editPassword} onChange={e => setEditPassword(e.target.value)} type="password" /></div>
+						<div className="grid gap-2">
+							<Label>角色</Label>
+							<select value={editRole} onChange={e => setEditRole(e.target.value)} className="h-9 rounded-xl border-2 border-border bg-background px-3 text-sm focus:outline-none focus:border-sakura">
+								<option value="user">普通用户 (user)</option>
+								<option value="admin">管理员 (admin)</option>
+							</select>
+						</div>
 					</div>
 					<DialogFooter>
 						<Button variant="outline" onClick={() => setEditOpen(false)}>取消</Button>
@@ -914,11 +948,13 @@ function SystemSettingsTab() {
 site_primary_color: '#f43f8e',
 
 		site_favicon_url: '',
+		site_logo_url: '',
 		// 外观
 		site_bg_image: '',
 		site_bg_opacity: '1',
 		site_custom_css: '',
 		site_custom_js: '',
+		site_theme: 'pink-cute',
 		// 内容
 		site_announcement: '',
 		site_footer_html: '',
@@ -929,15 +965,20 @@ site_primary_color: '#f43f8e',
 		// 安全
 		site_allowed_regions: '',
 		site_blocked_regions: '',
-		site_post_rate_limit: ',
+          site_post_rate_limit: '',
 		site_comment_rate_limit: '',
 		site_keyword_filter: '',
+		force_login: false,
+		resend_key: '',
+		resend_from: '',
+		resend_from_name: '',
 	});
 	const [loading, setLoading] = React.useState(false);
 	const [fetchLoading, setFetchLoading] = React.useState(true);
 	const [saved, setSaved] = React.useState(false);
 	const [error, setError] = React.useState('');
 	const [uploadingFavicon, setUploadingFavicon] = React.useState(false);
+	const [uploadingLogo, setUploadingLogo] = React.useState(false);
 	const [uploadingBg, setUploadingBg] = React.useState(false);
 	// 当前激活的分组
 	const [activeSection, setActiveSection] = React.useState<'basic' | 'appearance' | 'content' | 'protocol' | 'security' | 'notify'>('basic');
@@ -957,10 +998,12 @@ site_primary_color: '#f43f8e',
 					site_description: data.site_description || '',
 					site_primary_color: data.site_primary_color || '#f43f8e',
 					site_favicon_url: data.site_favicon_url || '',
+					site_logo_url: data.site_logo_url || '',
 					site_bg_image: data.site_bg_image || '',
 					site_bg_opacity: data.site_bg_opacity || '1',
 					site_custom_css: data.site_custom_css || '',
 					site_custom_js: data.site_custom_js || '',
+					site_theme: data.site_theme || 'pink-cute',
 					site_announcement: data.site_announcement || '',
 					site_footer_html: data.site_footer_html || '',
 					site_icp: data.site_icp || '',
@@ -971,6 +1014,10 @@ site_primary_color: '#f43f8e',
 					site_post_rate_limit: data.site_post_rate_limit || '',
 					site_comment_rate_limit: data.site_comment_rate_limit || '',
 					site_keyword_filter: data.site_keyword_filter || '',
+					force_login: !!data.force_login,
+					resend_key: data.resend_key || '',
+					resend_from: data.resend_from || '',
+					resend_from_name: data.resend_from_name || '',
 				}));
 			})
 			.catch(() => setError('加载设置失败'))
@@ -983,8 +1030,8 @@ site_primary_color: '#f43f8e',
 
 	const toast = useToast();
 
-	async function uploadImage(file: File, type: 'favicon' | 'bg') {
-		type === 'favicon' ? setUploadingFavicon(true) : setUploadingBg(true);
+	async function uploadImage(file: File, type: 'favicon' | 'logo' | 'bg') {
+		type === 'favicon' ? setUploadingFavicon(true) : type === 'logo' ? setUploadingLogo(true) : setUploadingBg(true);
 		try {
 			// 压缩图片，最大2MB，高压缩模式
 			const compressed = await imageCompression(file, {
@@ -1005,10 +1052,12 @@ site_primary_color: '#f43f8e',
 			const data = await res.json() as any;
 			if (!res.ok) throw new Error(data?.error || '上传失败');
 			if (!data.url) throw new Error('上传成功但未返回图片地址');
-			type === 'favicon' ? set('site_favicon_url', data.url) : set('site_bg_image', data.url);
-			toast('success', type === 'favicon' ? '图标上传成功' : '背景图上传成功');
+			if (type === 'favicon') set('site_favicon_url', data.url);
+			else if (type === 'logo') set('site_logo_url', data.url);
+			else set('site_bg_image', data.url);
+			toast('success', type === 'favicon' ? '图标上传成功' : type === 'logo' ? 'Logo上传成功' : '背景图上传成功');
 		} catch (e: any) { toast('error', e?.message || '上传失败'); }
-		type === 'favicon' ? setUploadingFavicon(false) : setUploadingBg(false);
+		type === 'favicon' ? setUploadingFavicon(false) : type === 'logo' ? setUploadingLogo(false) : setUploadingBg(false);
 	}
 
 	async function save() {
@@ -1033,6 +1082,7 @@ site_primary_color: '#f43f8e',
 		{ id: 'protocol',   icon: '📜', label: '协议' },
 		{ id: 'security',   icon: '🔒', label: '安全' },
 		{ id: 'notify',     icon: '🔔', label: '通知' },
+		{ id: 'email',      icon: '📧', label: '邮件' },
 	] as const;
 
 	if (fetchLoading) {
@@ -1075,7 +1125,26 @@ site_primary_color: '#f43f8e',
 							<p className="text-xs text-muted-foreground">显示在标题下方</p>
 						</div>
 					</div>
-					<div className="grid gap-4 sm:grid-cols-2">
+				<div className="grid gap-4 sm:grid-cols-2">
+						<div className="space-y-1.5">
+							<Label>网站 Logo</Label>
+							<div className="flex items-center gap-2">
+								{form.site_logo_url && (
+									<img src={form.site_logo_url} alt="logo" className="h-10 max-w-[120px] rounded object-contain border border-border" />
+								)}
+								<label className="flex-1 cursor-pointer">
+									<div className="flex items-center gap-2 h-9 px-3 rounded-xl border-2 border-dashed border-border hover:border-primary/40 transition-colors text-sm text-muted-foreground">
+										{uploadingLogo ? '上传中…' : '点击上传 Logo'}
+									</div>
+									<input type="file" accept="image/*" className="hidden" disabled={uploadingLogo}
+										onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f, 'logo'); }} />
+								</label>
+							</div>
+							{form.site_logo_url && (
+								<Input value={form.site_logo_url} onChange={e => set('site_logo_url', e.target.value)} placeholder="或直接输入 Logo URL" className="text-xs" />
+							)}
+							<p className="text-xs text-muted-foreground">显示在导航栏左上角（建议宽 ≤ 200px，高 ≤ 48px）</p>
+						</div>
 						<div className="space-y-1.5">
 							<Label htmlFor="site_primary_color">主体色调</Label>
 							<div className="flex items-center gap-2">
@@ -1090,6 +1159,8 @@ site_primary_color: '#f43f8e',
 						</div>
 						<p className="text-xs text-muted-foreground">默认 #f43f8e（玫瑰红）</p>
 						</div>
+					</div>
+					<div className="grid gap-4 sm:grid-cols-2">
 						<div className="space-y-1.5">
 							<Label>网站图标</Label>
 							<div className="flex items-center gap-2">
@@ -1097,7 +1168,7 @@ site_primary_color: '#f43f8e',
 									<img src={form.site_favicon_url} alt="favicon" className="h-8 w-8 rounded object-contain border border-border" />
 								)}
 								<label className="flex-1 cursor-pointer">
-									<div className="flex items-center gap-2 h-9 px-3 rounded-xl border-2 border-dashed border-border hover:border-sakura/60 transition-colors text-sm text-muted-foreground">
+									<div className="flex items-center gap-2 h-9 px-3 rounded-xl border-2 border-dashed border-border hover:border-primary/40 transition-colors text-sm text-muted-foreground">
 										{uploadingFavicon ? '上传中…' : '点击上传图标'}
 									</div>
 									<input type="file" accept="image/*" className="hidden" disabled={uploadingFavicon}
@@ -1166,6 +1237,37 @@ site_primary_color: '#f43f8e',
 							className="w-full rounded-xl border-2 border-border bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:border-sakura focus:shadow-[0_0_0_3px_rgba(255,183,197,0.4)] resize-y min-h-[100px]"
 						/>
 					</div>
+					<div className="space-y-3">
+						<Label>默认主题</Label>
+						<p className="text-xs text-muted-foreground">选择站点默认色彩主题，用户可在顶栏手动切换</p>
+						<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+							{([
+								{ value: 'pink-cute', label: '粉色可爱', icon: '🌸', desc: '二次元甜美风', preview: 'bg-gradient-to-br from-pink-300 via-rose-400 to-purple-400' },
+								{ value: 'blue-tech', label: '蓝色科技', icon: '💎', desc: '清透科技感', preview: 'bg-gradient-to-br from-blue-400 via-indigo-500 to-cyan-400' },
+								{ value: 'glass', label: '透明毛玻璃', icon: '🪟', desc: '轻盈梦幻感', preview: 'bg-gradient-to-br from-violet-300 via-purple-400 to-cyan-300' },
+								{ value: 'dark-tech', label: '黑色科技', icon: '🖤', desc: '暗夜霓虹', preview: 'bg-gradient-to-br from-emerald-800 via-teal-900 to-cyan-900' },
+							] as const).map(t => (
+								<button
+									key={t.value}
+									type="button"
+									onClick={() => set('site_theme', t.value)}
+									className={`relative flex flex-col items-center gap-1.5 rounded-2xl border-2 p-3 transition-all duration-200 hover:scale-[1.03]
+										${form.site_theme === t.value
+											? 'border-primary bg-primary/5 shadow-lg shadow-primary/10'
+											: 'border-border bg-card hover:border-primary/40'
+										}`}
+								>
+									<div className={`h-12 w-full rounded-xl ${t.preview} shadow-inner`} />
+									<span className="text-lg">{t.icon}</span>
+									<span className="text-xs font-semibold">{t.label}</span>
+									<span className="text-[10px] text-muted-foreground -mt-0.5">{t.desc}</span>
+									{form.site_theme === t.value && (
+										<span className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-primary flex items-center justify-center text-white text-[10px] shadow-md">✓</span>
+									)}
+								</button>
+							))}
+						</div>
+					</div>
 				</SettingSection>
 			)}
 
@@ -1232,6 +1334,10 @@ site_primary_color: '#f43f8e',
 			{/* ── 安全 ── */}
 			{activeSection === 'security' && (
 				<SettingSection icon="🔒" title="安全">
+					<div className="space-y-3 mb-4">
+						<Toggle checked={!!form.force_login} onChange={v => set('force_login', v)} label="强制登录访问" />
+						<p className="text-xs text-muted-foreground ml-12">开启后，未登录用户将被重定向到登录页，无法浏览任何内容</p>
+					</div>
 				<div className="space-y-1.5">
 						<Label htmlFor="site_allowed_regions">允许访问区域（白名单）</Label>
 						<Input
@@ -1304,6 +1410,53 @@ site_primary_color: '#f43f8e',
 				</SettingSection>
 			)}
 
+			{/* ── 邮件 ── */}
+			{activeSection === 'email' && (
+				<SettingSection icon="📧" title="邮件发送设置（Resend）">
+					<div className="rounded-xl border border-amber-200 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-700/30 p-4 mb-4">
+						<p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
+							📌 使用 <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="underline font-medium">Resend</a> 发送邮件。
+							在 Resend 注册后获取 API Key，并验证你的发件域名。配置后将优先使用此处的设置，未配置时回退到环境变量。
+						</p>
+					</div>
+					<div className="space-y-4">
+						<div className="space-y-1.5">
+							<Label htmlFor="resend_key">Resend API Key</Label>
+							<Input
+								id="resend_key"
+								type="password"
+								value={form.resend_key}
+								onChange={e => set('resend_key', e.target.value)}
+								placeholder="re_xxxxxxxxxxxx"
+								className="font-mono text-sm"
+							/>
+							<p className="text-xs text-muted-foreground">在 Resend 后台 → API Keys 中创建</p>
+						</div>
+						<div className="space-y-1.5">
+							<Label htmlFor="resend_from">发件人邮箱地址</Label>
+							<Input
+								id="resend_from"
+								type="email"
+								value={form.resend_from}
+								onChange={e => set('resend_from', e.target.value)}
+								placeholder="noreply@yourdomain.com"
+							/>
+							<p className="text-xs text-muted-foreground">需在 Resend 中验证此邮箱域名</p>
+						</div>
+						<div className="space-y-1.5">
+							<Label htmlFor="resend_from_name">发件人显示名称</Label>
+							<Input
+								id="resend_from_name"
+								value={form.resend_from_name}
+								onChange={e => set('resend_from_name', e.target.value)}
+								placeholder="论坛管理员"
+							/>
+							<p className="text-xs text-muted-foreground">可选，留空默认「论坛管理员」</p>
+						</div>
+					</div>
+				</SettingSection>
+			)}
+
 			{/* 保存按钮 */}
 			<div className="flex items-center gap-3 pt-2 border-t border-sakura/20">
 				<Button onClick={save} disabled={loading} className="px-8">
@@ -1363,11 +1516,11 @@ export function AdminPage() {
 			<div className="flex flex-col gap-6">
 				{/* 页头 */}
 				<div className="flex items-center gap-3">
-				<div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-[#f43f8e] to-[#a855f7] flex items-center justify-center text-white shadow-anime">
+				<div className="h-10 w-10 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground shadow-anime">
 						<Shield className="h-5 w-5" />
 					</div>
 					<div>
-						<h1 className="font-display text-2xl font-bold bg-gradient-to-r from-[#f43f8e] to-[#a855f7] bg-clip-text text-transparent">管理后台</h1>
+						<h1 className="font-display text-2xl font-bold text-primary">管理后台</h1>
 						<p className="text-xs text-muted-foreground">欢迎回来，{user?.username} ✨</p>
 					</div>
 				</div>

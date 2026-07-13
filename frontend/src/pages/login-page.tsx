@@ -66,15 +66,14 @@ export function LoginPage() {
 	}
 
 	return (
-		<AuthPageShell>
+		<AuthPageShell icon="🌸" subtitle={t.welcomeBack}>
 			<AuthCard>
 				<div className="p-8">
-					{/* 标题 */}
+					{/* 卡片标题 */}
 					<div className="text-center mb-8">
-						<div className="text-4xl mb-3 animate-bounce-gentle">🌸</div>
-						<h1 className="font-display text-2xl font-bold bg-gradient-to-r from-[#f43f8e] to-[#a855f7] bg-clip-text text-transparent">
-							{t.welcomeBack}
-						</h1>
+						<h2 className="font-display text-xl font-bold text-foreground">
+							{t.loginBtn}
+						</h2>
 						<p className="text-sm text-muted-foreground mt-1">{t.loginSubtitle}</p>
 					</div>
 

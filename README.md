@@ -135,7 +135,7 @@ Cloudflare Pages CDN (智能路由)
 4. 完成验证 ✅
 
 **默认管理员账号**（首次登录后请立即修改！）：
-- 邮箱: `admin@adysec.com` / 密码: `Admin@123`
+- 邮箱: `admin@admin.com` / 密码: `admin@123`
 
 ## 📄 许可证
 

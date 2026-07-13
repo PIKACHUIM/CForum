@@ -34,7 +34,7 @@ export const DialogContent = React.forwardRef<
 			ref={ref}
 			className={cn(
 				'fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2',
-				'rounded-2xl border-2 border-sakura/30 bg-background/95 p-6 shadow-anime-lg',
+			'rounded-2xl border border-border bg-background/98 p-6 shadow-elevated backdrop-blur-md',
 				'backdrop-blur-md',
 				'data-[state=open]:animate-in data-[state=closed]:animate-out',
 				'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -43,10 +43,9 @@ export const DialogContent = React.forwardRef<
 			)}
 			{...props}
 		>
-			{/* 渐变顶部装饰条 */}
-			<div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl bg-gradient-to-r from-sakura via-lavender to-sky" />
+		{/* 无装饰条 — 现代简约 */}
 			{children}
-			<DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-1 opacity-70 ring-offset-background transition-all hover:opacity-100 hover:bg-sakura/10 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+			<DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-1 opacity-70 ring-offset-background transition-all hover:opacity-100 hover:bg-muted hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
 				<X className="h-4 w-4" />
 				<span className="sr-only">关闭</span>
 			</DialogPrimitive.Close>

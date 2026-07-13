@@ -426,6 +426,22 @@ export default {
              }
         }
 
+        // force_login: 当开启强制登录时，保护内容类 GET 请求
+        const alwaysPublicPaths = ['/api/config', '/api/login', '/api/register', '/api/verify',
+            '/api/auth/forgot-password', '/api/auth/reset-password', '/api/verify-email-change'];
+        const isContentGet = method === 'GET' && !alwaysPublicPaths.includes(url.pathname) && (
+            url.pathname.startsWith('/api/posts') ||
+            url.pathname.startsWith('/api/categories') ||
+            url.pathname === '/api/users' ||
+            url.pathname.match(/^\/api\/user\/\d+\/profile$/)
+        );
+        if (isContentGet) {
+            const forceLoginRow = await env.cfwforum_db.prepare("SELECT value FROM settings WHERE key = 'force_login'").first<DBSetting>();
+            if (forceLoginRow && forceLoginRow.value === '1') {
+                try { await authenticate(request); } catch (e) { return handleError(e); }
+            }
+        }
+
 		// GET /api/config
 		if (url.pathname === '/api/config' && method === 'GET') {
 			try {
@@ -455,10 +471,11 @@ export default {
 					user_count: userCount || 0,
 					jwt_secret_configured: !!env.JWT_SECRET && String(env.JWT_SECRET).length >= 32,
 					// 站点设置
-					site_title: settingsMap['site_title'] || '',
+				site_title: settingsMap['site_title'] || '',
 					site_description: settingsMap['site_description'] || '',
 					site_primary_color: settingsMap['site_primary_color'] || '#e879a0',
 					site_favicon_url: settingsMap['site_favicon_url'] || '',
+					site_logo_url: settingsMap['site_logo_url'] || '',
 					site_announcement: settingsMap['site_announcement'] || '',
 					site_icp: settingsMap['site_icp'] || '',
 					site_footer_html: settingsMap['site_footer_html'] || '',
@@ -472,7 +489,9 @@ export default {
 					site_blocked_regions: settingsMap['site_blocked_regions'] || '',
 					site_post_rate_limit: settingsMap['site_post_rate_limit'] || '',
 					site_comment_rate_limit: settingsMap['site_comment_rate_limit'] || '',
-					site_keyword_filter: settingsMap['site_keyword_filter'] || '',
+				site_keyword_filter: settingsMap['site_keyword_filter'] || '',
+					site_theme: settingsMap['site_theme'] || 'pink-cute',
+					force_login: settingsMap['force_login'] === '1',
 				});
 			} catch (e) {
 				return handleError(e);
@@ -486,8 +505,9 @@ export default {
 				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
 
 				const settings = await env.cfwforum_db.prepare("SELECT key, value FROM settings").all();
-				const config: any = {
+			const config: any = {
 					turnstile_enabled: false,
+					force_login: false,
 					notify_on_user_delete: false,
 					notify_on_username_change: false,
 					notify_on_avatar_change: false,
@@ -496,6 +516,7 @@ export default {
 					site_description: '',
 					site_primary_color: '#e879a0',
 					site_favicon_url: '',
+					site_logo_url: '',
 					site_announcement: '',
 					site_icp: '',
 					site_footer_html: '',
@@ -508,11 +529,15 @@ export default {
 					site_allowed_regions: '',
 					site_blocked_regions: '',
 					site_post_rate_limit: '',
-					site_comment_rate_limit: '',
+				site_comment_rate_limit: '',
 					site_keyword_filter: '',
+					site_theme: 'pink-cute',
+					resend_key: '',
+					resend_from: '',
+					resend_from_name: '',
 				};
 
-				const boolKeys = ['turnstile_enabled', 'notify_on_user_delete', 'notify_on_username_change', 'notify_on_avatar_change', 'notify_on_manual_verify'];
+				const boolKeys = ['force_login', 'turnstile_enabled', 'notify_on_user_delete', 'notify_on_username_change', 'notify_on_avatar_change', 'notify_on_manual_verify'];
 				if (settings.results) {
 					for (const row of settings.results as any[]) {
 						if (boolKeys.includes(row.key)) {
@@ -541,7 +566,7 @@ export default {
 				const batch = [];
 
 				// 布尔类型设置
-				const boolKeys = ['turnstile_enabled', 'notify_on_user_delete', 'notify_on_username_change', 'notify_on_avatar_change', 'notify_on_manual_verify'];
+				const boolKeys = ['force_login', 'turnstile_enabled', 'notify_on_user_delete', 'notify_on_username_change', 'notify_on_avatar_change', 'notify_on_manual_verify'];
 				for (const key of boolKeys) {
 					if (body[key] !== undefined) batch.push(stmt.bind(key, body[key] ? '1' : '0'));
 				}
@@ -549,11 +574,13 @@ export default {
 				// 字符串类型设置
 				const strKeys = [
 					'site_title', 'site_description', 'site_primary_color', 'site_favicon_url',
+					'site_logo_url',
 					'site_announcement', 'site_icp', 'site_footer_html', 'site_bg_image',
 					'site_bg_opacity', 'site_custom_css', 'site_custom_js', 'site_terms',
 				'site_privacy', 'site_allowed_regions', 'site_blocked_regions', 'site_post_rate_limit',
 					'site_comment_rate_limit', 'site_keyword_filter',
-					'turnstile_site_key'
+					'turnstile_site_key', 'site_theme',
+					'resend_key', 'resend_from', 'resend_from_name',
 				];
 				for (const key of strKeys) {
 					if (body[key] !== undefined) batch.push(stmt.bind(key, String(body[key])));
@@ -660,6 +687,11 @@ export default {
 
 				if (!(await verifyPassword(password, user.password))) {
 					return jsonResponse({ error: 'Username or Password Error' }, 401);
+				}
+
+				// 检查用户是否被封禁
+				if (user.status === 'banned') {
+					return jsonResponse({ error: '账号已被封禁，如有疑问请联系管理员' }, 403);
 				}
 
 				// TOTP Check
@@ -1051,7 +1083,7 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 					<p>此链接将在 1 小时后失效。</p>
 				`;
 
-				ctx.waitUntil(sendEmail(email, '密码重置请求', emailHtml, env).catch(console.error));
+			ctx.waitUntil(sendEmail(email, '密码重置请求', emailHtml, env, env.cfwforum_db).catch(console.error));
 				return jsonResponse({ success: true });
 			} catch (e) {
 				return handleError(e);
@@ -1194,7 +1226,7 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE id = ?').b
 					<a href="${verifyLink}">确认更换</a>
 				`;
 
-				ctx.waitUntil(sendEmail(new_email, '确认更换邮箱', emailHtml, env).catch(console.error));
+			ctx.waitUntil(sendEmail(new_email, '确认更换邮箱', emailHtml, env, env.cfwforum_db).catch(console.error));
 				return jsonResponse({ success: true });
 			} catch (e) {
 				return handleError(e);
@@ -1227,7 +1259,7 @@ const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE email_chan
 				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
 
 				const body = await request.json() as any;
-				const { password, email, username, avatar_url } = body;
+				const { password, email, username, avatar_url, role } = body;
 
 				if (password && (password.length < 8 || password.length > 16)) return jsonResponse({ error: 'Password must be 8-16 characters' }, 400);
 
@@ -1261,7 +1293,7 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 								<h1>头像已更新</h1>
 								<p>您的头像已被管理员更新。</p>
 							`;
-							ctx.waitUntil(sendEmail(user.email, '您的头像已更新', emailHtml, env).catch(console.error));
+			ctx.waitUntil(sendEmail(user.email, '您的头像已更新', emailHtml, env, env.cfwforum_db).catch(console.error));
 						}
 					}
 				}
@@ -1283,14 +1315,78 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 							<p>您的用户名已被管理员修改为 <strong>${escapeHtml(username)}</strong>。</p>
 							<p>如有疑问，请联系管理员。</p>
 						`;
-							ctx.waitUntil(sendEmail(user.email, '您的用户名已修改', emailHtml, env).catch(console.error));
+			ctx.waitUntil(sendEmail(user.email, '您的用户名已修改', emailHtml, env, env.cfwforum_db).catch(console.error));
 						}
 					}
 				}
 
-				await security.logAudit(userPayload.id, 'ADMIN_UPDATE_USER', 'user', id, { username, email, avatar_url, passwordChanged: !!password }, request);
+				if (role && ['admin', 'user'].includes(role)) {
+					// 系统内置管理员 admin 不可被取消管理员
+					const targetUser = await env.cfwforum_db.prepare('SELECT username FROM users WHERE id = ?').bind(id).first<{username:string}>();
+					if (targetUser && targetUser.username === 'admin' && role === 'user') {
+						return jsonResponse({ error: '系统内置管理员不可被取消管理员权限' }, 403);
+					}
+					// 管理员不能取消自己的管理员权限
+					if (String(id) === String(userPayload.id) && role === 'user') {
+						return jsonResponse({ error: '不能取消自己的管理员权限' }, 403);
+					}
+					await env.cfwforum_db.prepare('UPDATE users SET role = ? WHERE id = ?').bind(role, id).run();
+				}
+
+			await security.logAudit(userPayload.id, 'ADMIN_UPDATE_USER', 'user', id, { username, email, avatar_url, role, passwordChanged: !!password }, request);
 
 				return jsonResponse({ success: true });
+			} catch (e) {
+				return handleError(e);
+			}
+		}
+
+		// POST /api/admin/users/:id/role (设置/取消管理员)
+		// 系统内置管理员 admin (username) 不可被取消管理员角色
+		if (url.pathname.match(/^\/api\/admin\/users\/\d+\/role$/) && method === 'POST') {
+			const id = url.pathname.split('/')[4];
+			try {
+				const userPayload = await authenticate(request);
+				if (userPayload.role !== 'admin') return jsonResponse({ error: 'Unauthorized' }, 403);
+
+				const body = await request.json() as any;
+				const { role } = body;
+				if (!role || !['admin', 'user'].includes(role)) {
+					return jsonResponse({ error: 'role 必须为 admin 或 user' }, 400);
+				}
+
+				// 获取目标用户信息
+				const targetUser = await env.cfwforum_db.prepare('SELECT id, email, username, role FROM users WHERE id = ?').bind(id).first<{id:number;email:string;username:string;role:string}>();
+				if (!targetUser) return jsonResponse({ error: 'User not found' }, 404);
+
+				// 系统内置管理员 admin (username) 不可被取消管理员
+				if (targetUser.username === 'admin' && role === 'user') {
+					return jsonResponse({ error: '系统内置管理员不可被取消管理员权限' }, 403);
+				}
+
+				// 管理员不能取消自己的管理员权限（允许降级自己之外的操作）
+				if (String(targetUser.id) === String(userPayload.id) && role === 'user') {
+					return jsonResponse({ error: '不能取消自己的管理员权限' }, 403);
+				}
+
+				// 如果角色未改变，直接返回成功
+				if (targetUser.role === role) {
+					return jsonResponse({ success: true, message: '角色未改变' });
+				}
+
+				await env.cfwforum_db.prepare('UPDATE users SET role = ? WHERE id = ?').bind(role, id).run();
+				await security.logAudit(userPayload.id, role === 'admin' ? 'SET_ADMIN_ROLE' : 'REMOVE_ADMIN_ROLE', 'user', id, { previous_role: targetUser.role, new_role: role }, request);
+
+				// 通知用户角色变更
+				const notifySetting = await env.cfwforum_db.prepare("SELECT value FROM settings WHERE key = 'notify_on_role_change'").first<DBSetting>();
+				if (notifySetting && notifySetting.value === '1') {
+					const emailHtml = role === 'admin'
+						? `<h1>角色变更通知</h1><p>您的账户 (用户名: <strong>${escapeHtml(targetUser.username)}</strong>) 已被设置为<strong>管理员</strong>。</p>`
+						: `<h1>角色变更通知</h1><p>您的账户 (用户名: <strong>${escapeHtml(targetUser.username)}</strong>) 的管理员权限已被取消。</p><p>如有疑问，请联系管理员。</p>`;
+					ctx.waitUntil(sendEmail(targetUser.email, '角色变更通知', emailHtml, env, env.cfwforum_db).catch(console.error));
+				}
+
+				return jsonResponse({ success: true, message: role === 'admin' ? '已设置为管理员' : '已取消管理员权限' });
 			} catch (e) {
 				return handleError(e);
 			}
@@ -1408,7 +1504,7 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 						<p>您的账户 (用户名: <strong>${escapeHtml(user.username)}</strong>) 已通过管理员手动验证。</p>
 						<p>您现在可以登录并使用所有功能。</p>
 					`;
-					ctx.waitUntil(sendEmail(user.email as string, '您的账户已通过验证', emailHtml, env).catch(console.error));
+			ctx.waitUntil(sendEmail(user.email as string, '您的账户已通过验证', emailHtml, env, env.cfwforum_db).catch(console.error));
 				}
 
 				return jsonResponse({ success });
@@ -1437,15 +1533,27 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 
 				const baseUrl = getBaseUrl();
 				const verifyLink = `${baseUrl}/api/verify?token=${token}`;
+				const siteTitleRow = await env.cfwforum_db.prepare("SELECT value FROM settings WHERE key = 'site_title'").first<DBSetting>();
+				const siteTitle = siteTitleRow?.value || '论坛';
 				const emailHtml = `
-					<h1>欢迎加入论坛，${escapeHtml(user.username)}！</h1>
-					<p>请点击下方链接验证您的邮箱地址：</p>
-					<a href="${verifyLink}">验证邮箱</a>
-					<p>如果您未请求此操作，请忽略此邮件。</p>
-				`;
+<div style="max-width:600px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif">
+	<div style="background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);padding:40px 30px;text-align:center;border-radius:12px 12px 0 0">
+		<h1 style="color:#ffffff;margin:0;font-size:26px;font-weight:700;letter-spacing:0.5px">🎉 欢迎加入 ${escapeHtml(siteTitle)}</h1>
+		<p style="color:rgba(255,255,255,0.92);margin:14px 0 0;font-size:16px;font-weight:400">你好，${escapeHtml(user.username)}！</p>
+	</div>
+	<div style="background:#ffffff;padding:36px 30px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
+		<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 8px">感谢你的注册！请点击下方按钮验证邮箱地址，即可开始使用：</p>
+		<div style="text-align:center;margin:32px 0">
+			<a href="${verifyLink}" style="display:inline-block;background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 4px 14px rgba(99,102,241,0.35)">验证邮箱地址</a>
+		</div>
+		<p style="color:#9ca3af;font-size:13px;margin:20px 0 0;line-height:1.6">如果按钮无法点击，请复制以下链接到浏览器：<br><a href="${verifyLink}" style="color:#6366f1;word-break:break-all;text-decoration:none">${verifyLink}</a></p>
+		<hr style="border:none;border-top:1px solid #f3f4f6;margin:28px 0 0">
+		<p style="color:#d1d5db;font-size:12px;margin:16px 0 0;text-align:center">如果你未请求此操作，请忽略此邮件。</p>
+	</div>
+</div>`;
 
 				ctx.waitUntil(
-					sendEmail(user.email, '请验证您的邮箱', emailHtml, env)
+			sendEmail(user.email, '请验证您的邮箱', emailHtml, env, env.cfwforum_db)
 						.catch(err => console.error('[Background Email Error]', err))
 				);
 
@@ -1508,7 +1616,7 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 							<p>您的账户 (用户名: <strong>${escapeHtml(userToDelete.username as string)}</strong>) 已被管理员删除。</p>
 							<p>如果您认为这是误操作，请联系管理员。</p>
 						`;
-						ctx.waitUntil(sendEmail(userToDelete.email as string, '您的账户已被删除', emailHtml, env).catch(console.error));
+			ctx.waitUntil(sendEmail(userToDelete.email as string, '您的账户已被删除', emailHtml, env, env.cfwforum_db).catch(console.error));
 					}
 				}
 
@@ -1944,7 +2052,7 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 				if (!to) return jsonResponse({ error: '缺少收件人地址' }, 400);
 
 				console.log('[DEBUG] Starting test email to:', to);
-				await sendEmail(to, '测试邮件', '<h1>你好</h1><p>这是一封测试邮件。</p>', env);
+			await sendEmail(to, '测试邮件', '<h1>你好</h1><p>这是一封测试邮件。</p>', env, env.cfwforum_db);
 				console.log('[DEBUG] Test email sent successfully');
 
 				return jsonResponse({ success: true, message: '邮件已发送' });
@@ -1997,15 +2105,27 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 				const baseUrl = getBaseUrl();
 				const verifyLink = `${baseUrl}/api/verify?token=${verificationToken}`;
 
+				const siteTitleRow = await env.cfwforum_db.prepare("SELECT value FROM settings WHERE key = 'site_title'").first<DBSetting>();
+				const siteTitle = siteTitleRow?.value || '论坛';
 				const emailHtml = `
-					<h1>欢迎加入论坛，${escapeHtml(username)}！</h1>
-					<p>请点击下方链接验证您的邮箱地址：</p>
-					<a href="${verifyLink}">验证邮箱</a>
-					<p>如果您未请求此操作，请忽略此邮件。</p>
-				`;
+<div style="max-width:600px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif">
+	<div style="background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);padding:40px 30px;text-align:center;border-radius:12px 12px 0 0">
+		<h1 style="color:#ffffff;margin:0;font-size:26px;font-weight:700;letter-spacing:0.5px">🎉 欢迎加入 ${escapeHtml(siteTitle)}</h1>
+		<p style="color:rgba(255,255,255,0.92);margin:14px 0 0;font-size:16px;font-weight:400">你好，${escapeHtml(username)}！</p>
+	</div>
+	<div style="background:#ffffff;padding:36px 30px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px">
+		<p style="color:#374151;font-size:15px;line-height:1.7;margin:0 0 8px">感谢你的注册！请点击下方按钮验证邮箱地址，即可开始使用：</p>
+		<div style="text-align:center;margin:32px 0">
+			<a href="${verifyLink}" style="display:inline-block;background:linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:600;box-shadow:0 4px 14px rgba(99,102,241,0.35)">验证邮箱地址</a>
+		</div>
+		<p style="color:#9ca3af;font-size:13px;margin:20px 0 0;line-height:1.6">如果按钮无法点击，请复制以下链接到浏览器：<br><a href="${verifyLink}" style="color:#6366f1;word-break:break-all;text-decoration:none">${verifyLink}</a></p>
+		<hr style="border:none;border-top:1px solid #f3f4f6;margin:28px 0 0">
+		<p style="color:#d1d5db;font-size:12px;margin:16px 0 0;text-align:center">如果你未请求此操作，请忽略此邮件。</p>
+	</div>
+</div>`;
 
 				try {
-					await sendEmail(email, '请验证您的邮箱', emailHtml, env);
+			await sendEmail(email, '请验证您的邮箱', emailHtml, env, env.cfwforum_db);
 				} catch (e) {
 					console.error('[Registration Email Error]', e);
 					const errorMsg = e instanceof Error ? e.message : '未知错误';
@@ -2019,6 +2139,7 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 					'INSERT INTO users (email, username, password, role, verified, verification_token) VALUES (?, ?, ?, "user", 0, ?)'
 				).bind(email, username, passwordHash, verificationToken).run();
 
+				let avatarUrl = '';
 				if (success) {
 					// Generate Default Avatar (Identicon)
 					// Use ID if available, otherwise fallback to Username
@@ -2026,12 +2147,41 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 					if (userId) {
 						const identicon = await generateIdenticon(String(userId));
 						await env.cfwforum_db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').bind(identicon, userId).run();
+						avatarUrl = identicon;
 					} else {
 						// Fallback if ID retrieval fails (rare in D1)
 						const identicon = await generateIdenticon(username);
 						// We don't have ID easily without query, but we can update by username or just skip
 						await env.cfwforum_db.prepare('UPDATE users SET avatar_url = ? WHERE username = ?').bind(identicon, username).run();
+						avatarUrl = identicon;
 					}
+				}
+
+				// 注册成功后自动登录
+				const newUserId = meta?.last_row_id as number | undefined;
+				if (newUserId) {
+					const { token, jti, expiresAt } = await security.generateToken({
+						id: newUserId,
+						role: 'user',
+						email: email
+					});
+					await env.cfwforum_db.prepare('INSERT INTO sessions (jti, user_id, expires_at) VALUES (?, ?, ?)').bind(jti, newUserId, expiresAt).run();
+
+					return jsonResponse({
+						success,
+						message: '注册成功，请前往邮箱完成验证。',
+						token,
+						user: {
+							id: newUserId,
+							email,
+							username,
+							avatar_url: avatarUrl,
+							role: 'user',
+							totp_enabled: false,
+							email_notifications: true,
+							verified: false
+						}
+					}, 201);
 				}
 
 				return jsonResponse({ success, message: '注册成功，请前往邮箱完成验证。' }, 201);

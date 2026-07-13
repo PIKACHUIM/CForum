@@ -367,24 +367,26 @@ export function PostPage() {
 						</div>
 					)}
 						<Card>
-<CardHeader className="rounded-t-2xl bg-gradient-to-r from-[#f43f8e]/10 via-[#a855f7]/10 to-[#38bdf8]/10 border-b border-[#f43f8e]/15">
+<CardHeader className="rounded-t-2xl bg-muted/30 border-b border-border">
 								<CardTitle className="flex flex-col gap-2">
-									<span className="font-display text-2xl bg-gradient-to-r from-[#f43f8e] to-[#a855f7] bg-clip-text text-transparent">{post.title}</span>
+									<span className="font-display text-2xl text-primary">{post.title}</span>
 						<span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-normal text-muted-foreground">
-							<a href={`/profile?id=${post.author_id}`} className="inline-flex items-center gap-2 hover:text-primary transition-colors">
+					<a href={`/profile?id=${post.author_id}`} className="inline-flex items-center gap-2 hover:text-primary transition-colors">
+								<span className="avatar-anime h-8 w-8">
 								{post.author_avatar ? (
 									<img
 										src={post.author_avatar}
 										alt=""
-										className="h-6 w-6 rounded-full object-cover"
+										className="h-8 w-8 rounded-full object-cover"
 										loading="lazy"
 										referrerPolicy="no-referrer"
 									/>
 								) : (
-									<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
+									<span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
 										<User className="h-4 w-4" />
 									</span>
 								)}
+								</span>
 								<span className="text-foreground">{post.author_name}</span>
 								{post.author_role === 'admin' ? (
 									<span className="inline-flex items-center gap-1 rounded border border-indigo-500/30 bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
@@ -572,7 +574,7 @@ export function PostPage() {
 						</Card>
 
 							<Card>
-							<CardHeader className="rounded-t-2xl bg-gradient-to-r from-lavender/15 to-sky/15 border-b border-lavender/20">
+							<CardHeader className="rounded-t-2xl bg-muted/30 border-b border-border">
 							<CardTitle className="font-display flex items-center gap-2">
 								<span>💬</span> {t.comments}
 								{(post as any).status === 'locked' && (
@@ -592,18 +594,18 @@ export function PostPage() {
 											<div key={c.id} className={`comment-bubble p-4 ${ (c as any).status === 'locked' ? 'opacity-60 border-orange-300/50' : '' }`}>
 													<div className="flex items-center justify-between gap-2">
 											<div className="text-sm">
-												<a href={`/profile?id=${c.author_id}`} className="inline-flex items-center gap-2 hover:text-primary transition-colors">
-													<span className="avatar-anime">
+<a href={`/profile?id=${c.author_id}`} className="inline-flex items-center gap-2 hover:text-primary transition-colors">
+													<span className="avatar-anime h-8 w-8">
 													{c.avatar_url ? (
 														<img
 															src={c.avatar_url}
 															alt=""
-															className="h-6 w-6 rounded-full object-cover"
+															className="h-8 w-8 rounded-full object-cover"
 															loading="lazy"
 															referrerPolicy="no-referrer"
 														/>
 													) : (
-<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#f43f8e] to-[#a855f7] text-white text-[10px]">
+<span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
 														<User className="h-4 w-4" />
 													</span>
 													)}
@@ -636,25 +638,27 @@ export function PostPage() {
 									)}
 											<div className="mt-2 whitespace-pre-wrap text-sm">{c.content}</div>
 													{c.replies && c.replies.length ? (
-														<div className="mt-3 space-y-2 border-l-2 border-sakura/30 pl-4">
+<div className="mt-3 space-y-2 border-l-2 border-border pl-4">
 															{c.replies.map((r) => (
 																<div key={r.id} className="comment-bubble-reply p-3">
 																<div className="flex items-center justify-between gap-2">
 																	<div className="text-xs">
 																		<span className="inline-flex items-center gap-2">
+																					<span className="avatar-anime h-7 w-7">
 																			{r.avatar_url ? (
 																				<img
 																					src={r.avatar_url}
 																					alt=""
-																					className="h-5 w-5 rounded-full object-cover"
+																					className="h-7 w-7 rounded-full object-cover"
 																					loading="lazy"
 																					referrerPolicy="no-referrer"
 																				/>
 																			) : (
-																				<span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
+																				<span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground">
 																					<User className="h-3.5 w-3.5" />
 																				</span>
 																			)}
+																			</span>
 																			<span className="font-medium text-foreground">{r.username}</span>
 																			{r.role === 'admin' ? (
 																				<span className="inline-flex items-center gap-1 rounded border border-indigo-500/30 bg-indigo-500/10 px-1 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
@@ -683,7 +687,7 @@ export function PostPage() {
 								)}
 
 								{replyTo ? (
-									<div className="flex items-center justify-between rounded-xl border-2 border-sakura/30 bg-sakura/5 p-3 text-sm">
+<div className="flex items-center justify-between rounded-xl border border-border bg-muted/20 p-3 text-sm">
 										<span className="flex items-center gap-2">
 											<span>💬</span>
 											{t.replyTo} <span className="font-medium text-primary">{replyTo.username}</span>

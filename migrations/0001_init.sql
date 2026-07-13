@@ -1,3 +1,8 @@
+-- CForum 完整数据库 Schema（合并所有迁移）
+-- 部署时自动初始化
+
+PRAGMA foreign_keys = OFF;
+
 DROP TABLE IF EXISTS comments;
 DROP TABLE IF EXISTS likes;
 DROP TABLE IF EXISTS posts;
@@ -6,6 +11,7 @@ DROP TABLE IF EXISTS settings;
 DROP TABLE IF EXISTS nonces;
 DROP TABLE IF EXISTS audit_logs;
 DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS sessions;
 
 CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -13,6 +19,7 @@ CREATE TABLE users (
   username TEXT NOT NULL,
   password TEXT NOT NULL,
   role TEXT DEFAULT 'user', -- 'user' or 'admin'
+  status TEXT DEFAULT 'normal', -- 'normal' or 'banned'
   verified INTEGER DEFAULT 0,
   verification_token TEXT,
   totp_secret TEXT,
@@ -24,6 +31,14 @@ CREATE TABLE users (
   avatar_url TEXT,
   nickname TEXT,
   email_notifications INTEGER DEFAULT 1,
+  -- 扩展个人资料字段
+  age INTEGER,
+  gender TEXT,
+  birthday TEXT,
+  attribute TEXT,
+  is_nanliang INTEGER DEFAULT 0,
+  bio TEXT,
+  bg_image TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -40,6 +55,7 @@ CREATE TABLE posts (
   content TEXT NOT NULL,
   category_id INTEGER,
   is_pinned INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'normal', -- 'normal', 'hidden', 'locked'
   view_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (author_id) REFERENCES users(id),
@@ -52,6 +68,7 @@ CREATE TABLE comments (
   parent_id INTEGER,
   author_id INTEGER NOT NULL,
   content TEXT NOT NULL,
+  status TEXT DEFAULT 'normal', -- 'normal', 'hidden', 'locked'
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (post_id) REFERENCES posts(id),
   FOREIGN KEY (parent_id) REFERENCES comments(id),
@@ -97,17 +114,32 @@ CREATE TABLE audit_logs (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 初始设置
 INSERT INTO settings (key, value) VALUES ('turnstile_enabled', '0');
+INSERT INTO settings (key, value) VALUES ('site_title', 'CForum');
+INSERT INTO settings (key, value) VALUES ('site_description', '');
+INSERT INTO settings (key, value) VALUES ('site_primary_color', '#e879a0');
+INSERT INTO settings (key, value) VALUES ('site_favicon_url', '');
+INSERT INTO settings (key, value) VALUES ('site_announcement', '');
+INSERT INTO settings (key, value) VALUES ('site_icp', '');
+INSERT INTO settings (key, value) VALUES ('site_footer_html', '');
+INSERT INTO settings (key, value) VALUES ('site_bg_image', '');
+INSERT INTO settings (key, value) VALUES ('site_bg_opacity', '1');
+INSERT INTO settings (key, value) VALUES ('site_custom_css', '');
+INSERT INTO settings (key, value) VALUES ('site_custom_js', '');
+INSERT INTO settings (key, value) VALUES ('site_terms', '');
+INSERT INTO settings (key, value) VALUES ('site_privacy', '');
+INSERT INTO settings (key, value) VALUES ('site_blocked_regions', '');
+INSERT INTO settings (key, value) VALUES ('site_allowed_regions', '');
+INSERT INTO settings (key, value) VALUES ('site_post_rate_limit', '');
+INSERT INTO settings (key, value) VALUES ('site_comment_rate_limit', '');
+INSERT INTO settings (key, value) VALUES ('site_keyword_filter', '');
 
--- Insert some dummy data
--- Admin user (admin@adysec.com / Admin@123)
--- Hash for 'Admin@123': ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f
-INSERT INTO users (email, username, password, role, verified, nickname) VALUES 
-('admin@adysec.com', 'Admin', 'e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3acc7', 'admin', 1, 'System Admin'),
-('alice@example.com', 'Alice', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f', 'user', 1, 'Alice Wonderland'),
-('bob@example.com', 'Bob', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f', 'user', 0, NULL);
-
+-- 初始分类数据
 INSERT INTO categories (name) VALUES ('General'), ('Tech'), ('Random');
 
-INSERT INTO posts (author_id, title, content, category_id) VALUES (1, 'Welcome to CForum', 'This is an official announcement from the admin.', 1);
-INSERT INTO posts (author_id, title, content, category_id) VALUES (2, 'Hello World', 'This is the first post by Alice!', 2);
+-- 初始管理员账户 (admin@admin.com / admin@123)
+INSERT INTO users (email, username, password, role, verified, nickname) VALUES
+('admin@admin.com', 'Admin', '7676aaafb027c825bd9abab78b234070e702752f625b752e55e55b48e607e358', 'admin', 1, 'System Admin');
+
+PRAGMA foreign_keys = ON;
