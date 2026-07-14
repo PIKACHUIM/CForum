@@ -92,9 +92,11 @@ export function PostPage() {
 		setLoading(true);
 		setError('');
 		try {
+			const headers: Record<string, string> = {};
+			if (token) headers.Authorization = `Bearer ${token}`;
 			const userParam = userId ? `?user_id=${userId}` : '';
-			const p = await apiFetch<Post>(`/posts/${postId}${userParam}`);
-			const cs = await apiFetch<Comment[]>(`/posts/${postId}/comments`);
+			const p = await apiFetch<Post>(`/posts/${postId}${userParam}`, { headers });
+			const cs = await apiFetch<Comment[]>(`/posts/${postId}/comments`, { headers });
 			setPost(p);
 			setComments(cs);
 			setEditTitle(p.title);
@@ -104,7 +106,7 @@ export function PostPage() {
 		} finally {
 			setLoading(false);
 		}
-	}, [postId, userId]);
+	}, [postId, userId, token]);
 
 	React.useEffect(() => {
 		refresh();

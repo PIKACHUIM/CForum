@@ -5,7 +5,7 @@ import { PageShell } from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiFetch, formatDate, type Post } from '@/lib/api';
-import { getUser } from '@/lib/auth';
+import { getUser, getToken } from '@/lib/auth';
 
 // 用户公开资料类型
 type PublicUser = {
@@ -72,13 +72,17 @@ export function ProfilePage() {
 		loadProfile(0, 0);
 	}, [userId]);
 
-	async function loadProfile(pOffset: number, cOffset: number) {
+		async function loadProfile(pOffset: number, cOffset: number) {
 		if (!userId) return;
 		setLoading(true);
 		setError('');
 		try {
+			const headers: Record<string, string> = {};
+			const token = getToken();
+			if (token) headers.Authorization = `Bearer ${token}`;
 			const result = await apiFetch<ProfileData>(
-				`/user/${userId}/profile?post_limit=${PAGE_SIZE}&post_offset=${pOffset}&comment_offset=${cOffset}`
+				`/user/${userId}/profile?post_limit=${PAGE_SIZE}&post_offset=${pOffset}&comment_offset=${cOffset}`,
+				{ headers }
 			);
 			setData(result);
 			setPostOffset(pOffset);

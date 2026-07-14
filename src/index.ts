@@ -514,10 +514,9 @@ env.cfwforum_db.prepare("SELECT COUNT(*) as count FROM users WHERE id != 0").fir
 				site_privacy: settingsMap['site_privacy'] || '',
 					site_allowed_regions: settingsMap['site_allowed_regions'] || '',
 					site_blocked_regions: settingsMap['site_blocked_regions'] || '',
-					site_post_rate_limit: settingsMap['site_post_rate_limit'] || '',
-					site_comment_rate_limit: settingsMap['site_comment_rate_limit'] || '',
-				site_keyword_filter: settingsMap['site_keyword_filter'] || '',
-					site_theme: settingsMap['site_theme'] || 'pink-cute',
+				site_post_rate_limit: settingsMap['site_post_rate_limit'] || '',
+				site_comment_rate_limit: settingsMap['site_comment_rate_limit'] || '',
+				site_theme: settingsMap['site_theme'] || 'pink-cute',
 					force_login: settingsMap['force_login'] === '1',
 				});
 			} catch (e) {
@@ -864,10 +863,21 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 				const user = await env.cfwforum_db.prepare('SELECT * FROM users WHERE id = ?').bind(targetUserId).first<DBUser>();
 				if (!user) return jsonResponse({ error: 'User not found' }, 404);
 
+				// 判断查看者是否为本人，本人可以看到自己隐藏的帖子和评论
+				let viewerId = -1;
+				try {
+					const viewerPayload = await authenticate(request);
+					viewerId = viewerPayload.id;
+				} catch {}
+			const isOwner = String(viewerId) === targetUserId;
+
 				// 获取用户帖子（最近20条）
 				const limit = Math.min(parseInt(url.searchParams.get('post_limit') || '20'), 50);
 				const postOffset = Math.max(parseInt(url.searchParams.get('post_offset') || '0'), 0);
 				const commentOffset = Math.max(parseInt(url.searchParams.get('comment_offset') || '0'), 0);
+
+				const postStatusCondition = isOwner ? '' : ` AND posts.status = 'normal'`;
+				const commentStatusCondition = isOwner ? '' : ` AND comments.status = 'normal' AND posts.status = 'normal'`;
 
 				const [postsResult, postsCount, commentsResult, commentsCount] = await Promise.all([
 					env.cfwforum_db.prepare(
@@ -876,23 +886,23 @@ if (avatar_url.length > 500) return jsonResponse({ error: 'Avatar URL too long (
 						(SELECT COUNT(*) FROM comments WHERE comments.post_id = posts.id) as comment_count
 						FROM posts
 						LEFT JOIN categories ON posts.category_id = categories.id
-						WHERE posts.author_id = ? AND posts.status = 'normal'
+						WHERE posts.author_id = ?${postStatusCondition}
 						ORDER BY posts.created_at DESC LIMIT ? OFFSET ?`
 					).bind(targetUserId, limit, postOffset).all(),
 					env.cfwforum_db.prepare(
-						`SELECT COUNT(*) as total FROM posts WHERE author_id = ? AND status = 'normal'`
+						`SELECT COUNT(*) as total FROM posts WHERE author_id = ?${postStatusCondition}`
 					).bind(targetUserId).first<DBCount>(),
 					env.cfwforum_db.prepare(
 						`SELECT comments.*, posts.title as post_title, posts.id as post_id
 						FROM comments
 						JOIN posts ON comments.post_id = posts.id
-						WHERE comments.author_id = ? AND comments.status = 'normal' AND posts.status = 'normal'
+						WHERE comments.author_id = ?${commentStatusCondition}
 						ORDER BY comments.created_at DESC LIMIT ? OFFSET ?`
 					).bind(targetUserId, limit, commentOffset).all(),
 					env.cfwforum_db.prepare(
 						`SELECT COUNT(*) as total FROM comments
 						JOIN posts ON comments.post_id = posts.id
-						WHERE comments.author_id = ? AND comments.status = 'normal' AND posts.status = 'normal'`
+						WHERE comments.author_id = ?${commentStatusCondition}`
 					).bind(targetUserId).first<DBCount>()
 				]);
 
@@ -2100,18 +2110,32 @@ env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM users WHERE id != 0').fir
 				// 2. Gather used URLs
 				const usedKeys = new Set<string>();
 
-				// Users avatars
-				const users = await env.cfwforum_db.prepare('SELECT avatar_url FROM users WHERE avatar_url IS NOT NULL').all();
+			// Users avatars and background images
+				const users = await env.cfwforum_db.prepare('SELECT avatar_url, bg_image FROM users WHERE avatar_url IS NOT NULL OR bg_image IS NOT NULL').all();
 				for (const u of users.results) {
-					const uUrl = u.avatar_url as string;
-					const key = uUrl ? getKeyFromUrl(env as unknown as S3Env, uUrl) : null;
+					const avatarUrl = u.avatar_url as string | null;
+					const bgImage = u.bg_image as string | null;
+					let key: string | null;
+					key = avatarUrl ? getKeyFromUrl(env as unknown as S3Env, avatarUrl) : null;
+					if (key) usedKeys.add(key);
+					key = bgImage ? getKeyFromUrl(env as unknown as S3Env, bgImage) : null;
 					if (key) usedKeys.add(key);
 				}
 
-			// Posts images
+		// Posts images
 				const posts = await env.cfwforum_db.prepare('SELECT content FROM posts').all();
 				for (const p of posts.results) {
 					const urls = extractImageUrls(p.content as string);
+					for (const uUrl of urls) {
+						const key = uUrl ? getKeyFromUrl(env as unknown as S3Env, uUrl) : null;
+						if (key) usedKeys.add(key);
+					}
+				}
+
+				// Comments images
+				const comments = await env.cfwforum_db.prepare('SELECT content FROM comments').all();
+				for (const c of comments.results) {
+					const urls = extractImageUrls(c.content as string);
 					for (const uUrl of urls) {
 						const key = uUrl ? getKeyFromUrl(env as unknown as S3Env, uUrl) : null;
 						if (key) usedKeys.add(key);
@@ -2366,8 +2390,21 @@ env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM users WHERE id != 0').fir
                 const countParams: any[] = [];
                 const conditions: string[] = [];
 
-			// 默认只显示正常状态的帖子（隐藏和锁定帖子不显示在公开列表）
-				conditions.push(`(posts.status = 'normal')`);
+			// 尝试获取当前登录用户，以便显示其自己的隐藏帖子
+				let currentUserId = -1;
+				try {
+					const userPayload = await authenticate(request);
+					currentUserId = userPayload.id;
+				} catch {}
+
+				// 默认只显示正常状态的帖子，但作者自己可以看到自己隐藏的帖子
+				if (currentUserId > 0) {
+					conditions.push(`(posts.status = 'normal' OR (posts.author_id = ? AND posts.status = 'hidden'))`);
+					params.push(currentUserId);
+					countParams.push(currentUserId);
+				} else {
+					conditions.push(`(posts.status = 'normal')`);
+				}
 
                 if (categoryId) {
                     if (categoryId === 'uncategorized') {
@@ -2448,21 +2485,9 @@ env.cfwforum_db.prepare('SELECT COUNT(*) as count FROM users WHERE id != 0').fir
 					} catch {
 						return jsonResponse({ error: 'Post not found' }, 404);
 					}
-				}
+			}
 
-				// 如果帖子已锁定，只有作者和管理员可以访问
-				if ((post as any).status === 'locked') {
-					try {
-						const userPayload = await authenticate(request);
-						if (userPayload.role !== 'admin' && userPayload.id !== (post as any).author_id) {
-							return jsonResponse({ error: 'Post not found' }, 404);
-						}
-					} catch {
-						return jsonResponse({ error: 'Post not found' }, 404);
-					}
-				}
-
-				try {
+			try {
 					await env.cfwforum_db.prepare('UPDATE posts SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?').bind(postId).run();
 					(post as any).view_count = Number((post as any).view_count || 0) + 1;
 				} catch {}

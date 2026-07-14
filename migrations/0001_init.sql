@@ -1,6 +1,3 @@
--- CForum 完整数据库 Schema（合并所有迁移）
--- 部署时自动初始化
-
 PRAGMA foreign_keys = OFF;
 
 DROP TABLE IF EXISTS comments;
